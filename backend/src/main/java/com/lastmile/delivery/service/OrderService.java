@@ -1,22 +1,405 @@
 package com.lastmile.delivery.service;
-import com.lastmile.delivery.dto.request.*;
-import com.lastmile.delivery.dto.response.OrderResponse;
-import com.lastmile.delivery.entity.*;
-import com.lastmile.delivery.repository.*;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.List;
+
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import java.math.*;
-import java.util.*;
 
-@Service @Transactional
+import com.lastmile.delivery.dto.request.CreateOrderRequest;
+import com.lastmile.delivery.dto.request.StatusUpdateRequest;
+import com.lastmile.delivery.dto.response.OrderResponse;
+import com.lastmile.delivery.entity.AttemptStatus;
+import com.lastmile.delivery.entity.CodCharge;
+import com.lastmile.delivery.entity.DeliveryAttempt;
+import com.lastmile.delivery.entity.DeliveryOrder;
+import com.lastmile.delivery.entity.OrderStatus;
+import com.lastmile.delivery.entity.OrderTrackingHistory;
+import com.lastmile.delivery.entity.PaymentType;
+import com.lastmile.delivery.entity.RateCard;
+import com.lastmile.delivery.entity.Role;
+import com.lastmile.delivery.entity.User;
+import com.lastmile.delivery.entity.Zone;
+import com.lastmile.delivery.repository.CodChargeRepository;
+import com.lastmile.delivery.repository.DeliveryAttemptRepository;
+import com.lastmile.delivery.repository.DeliveryOrderRepository;
+import com.lastmile.delivery.repository.OrderTrackingHistoryRepository;
+import com.lastmile.delivery.repository.RateCardRepository;
+import com.lastmile.delivery.repository.UserRepository;
+import com.lastmile.delivery.repository.ZoneRepository;
+
+@Service
+@Transactional
 public class OrderService {
- private final DeliveryOrderRepository orders; private final UserRepository users; private final ZoneRepository zones; private final RateCardRepository rates; private final CodChargeRepository cod; private final OrderTrackingHistoryRepository tracking; private final DeliveryAttemptRepository attempts;
- public OrderService(DeliveryOrderRepository orders, UserRepository users, ZoneRepository zones, RateCardRepository rates, CodChargeRepository cod, OrderTrackingHistoryRepository tracking, DeliveryAttemptRepository attempts){this.orders=orders;this.users=users;this.zones=zones;this.rates=rates;this.cod=cod;this.tracking=tracking;this.attempts=attempts;}
- public OrderResponse create(String email, CreateOrderRequest r){ User customer=user(email); Zone pickup=zone(r.pickupZoneId()), drop=zone(r.dropZoneId()); BigDecimal volume=r.lengthCm().multiply(r.widthCm()).multiply(r.heightCm()).divide(BigDecimal.valueOf(5000),3,RoundingMode.HALF_UP); BigDecimal weight=r.actualWeightKg().max(volume); RateCard rate=rates.findByPickupZoneIdAndDropZoneIdAndOrderType(pickup.getId(),drop.getId(),r.orderType()).orElseThrow(()->new IllegalArgumentException("No rate card for the selected zones and order type")); BigDecimal base=weight.multiply(rate.getRatePerKg()).max(rate.getMinimumCharge()).setScale(2,RoundingMode.HALF_UP); BigDecimal surcharge=r.paymentType()==PaymentType.COD?cod.findByOrderType(r.orderType()).map(CodCharge::getSurcharge).orElse(BigDecimal.ZERO):BigDecimal.ZERO; DeliveryOrder o=new DeliveryOrder(); o.setCustomer(customer);o.setPickupAddress(r.pickupAddress());o.setDropAddress(r.dropAddress());o.setPickupZone(pickup);o.setDropZone(drop);o.setLengthCm(r.lengthCm());o.setWidthCm(r.widthCm());o.setHeightCm(r.heightCm());o.setActualWeightKg(r.actualWeightKg());o.setVolumetricWeightKg(volume);o.setChargeableWeightKg(weight);o.setOrderType(r.orderType());o.setPaymentType(r.paymentType());o.setBaseCharge(base);o.setCodSurcharge(surcharge);o.setFinalCharge(base.add(surcharge));o.setStatus(OrderStatus.PLACED); o=orders.save(o); history(o,customer); return map(o); }
- public List<OrderResponse> mine(String email){User u=user(email); return (u.getRole()==Role.DELIVERY_AGENT?orders.findByDeliveryAgentIdOrderByUpdatedAtDesc(u.getId()):u.getRole()==Role.ADMIN?orders.findAll():orders.findByCustomerIdOrderByCreatedAtDesc(u.getId())).stream().map(this::map).toList();}
- public OrderResponse get(String email, Long id){DeliveryOrder o=order(id); User u=user(email); if(u.getRole()!=Role.ADMIN&&!o.getCustomer().getId().equals(u.getId())&&(o.getDeliveryAgent()==null||!o.getDeliveryAgent().getId().equals(u.getId()))) throw new org.springframework.security.access.AccessDeniedException("Not permitted"); return map(o);}
- public OrderResponse transition(String email,Long id,StatusUpdateRequest r){DeliveryOrder o=order(id);User actor=user(email); if(actor.getRole()==Role.DELIVERY_AGENT&&(o.getDeliveryAgent()==null||!o.getDeliveryAgent().getId().equals(actor.getId())))throw new org.springframework.security.access.AccessDeniedException("Not assigned"); if(!allowed(o.getStatus(),r.status()))throw new IllegalArgumentException("Invalid status transition"); o.setStatus(r.status()); if(r.status()==OrderStatus.FAILED||r.status()==OrderStatus.DELIVERED){DeliveryAttempt a=new DeliveryAttempt();a.setOrder(o);a.setDeliveryAgent(actor);a.setAttemptNumber((int)attempts.countByOrderId(id)+1);a.setStatus(r.status()==OrderStatus.DELIVERED?AttemptStatus.DELIVERED:AttemptStatus.FAILED);a.setFailureReason(r.failureReason());attempts.save(a);} history(o,actor);return map(o);}
- public OrderResponse assign(Long id,Long agentId,String email){DeliveryOrder o=order(id);User agent=users.findById(agentId).orElseThrow();if(agent.getRole()!=Role.DELIVERY_AGENT)throw new IllegalArgumentException("User is not a delivery agent");o.setDeliveryAgent(agent);history(o,user(email));return map(o);}
- private boolean allowed(OrderStatus a,OrderStatus b){return switch(a){case PLACED,RESCHEDULED->b==OrderStatus.PICKED_UP;case PICKED_UP->b==OrderStatus.IN_TRANSIT;case IN_TRANSIT->b==OrderStatus.OUT_FOR_DELIVERY;case OUT_FOR_DELIVERY->b==OrderStatus.DELIVERED||b==OrderStatus.FAILED;case FAILED->b==OrderStatus.RESCHEDULED;default->false;};}
- private void history(DeliveryOrder o,User actor){OrderTrackingHistory h=new OrderTrackingHistory();h.setOrder(o);h.setActor(actor);h.setStatus(o.getStatus());tracking.save(h);} private User user(String e){return users.findByEmailIgnoreCase(e).orElseThrow();}private Zone zone(Long id){return zones.findById(id).orElseThrow();}private DeliveryOrder order(Long id){return orders.findById(id).orElseThrow();}private OrderResponse map(DeliveryOrder o){return new OrderResponse(o.getId(),o.getCustomer().getId(),o.getDeliveryAgent()==null?null:o.getDeliveryAgent().getId(),o.getPickupAddress(),o.getDropAddress(),o.getPickupZone().getName(),o.getDropZone().getName(),o.getOrderType(),o.getPaymentType(),o.getStatus(),o.getChargeableWeightKg(),o.getFinalCharge(),o.getCreatedAt());}
+
+        private final DeliveryOrderRepository orders;
+        private final UserRepository users;
+        private final ZoneRepository zones;
+        private final RateCardRepository rates;
+        private final CodChargeRepository cod;
+        private final OrderTrackingHistoryRepository tracking;
+        private final DeliveryAttemptRepository attempts;
+
+        public OrderService(
+                        DeliveryOrderRepository orders,
+                        UserRepository users,
+                        ZoneRepository zones,
+                        RateCardRepository rates,
+                        CodChargeRepository cod,
+                        OrderTrackingHistoryRepository tracking,
+                        DeliveryAttemptRepository attempts) {
+                this.orders = orders;
+                this.users = users;
+                this.zones = zones;
+                this.rates = rates;
+                this.cod = cod;
+                this.tracking = tracking;
+                this.attempts = attempts;
+        }
+
+        public OrderResponse create(
+                        String email,
+                        CreateOrderRequest request) {
+                User customer = findUser(email);
+
+                Zone pickupZone = findZone(request.pickupZoneId());
+                Zone dropZone = findZone(request.dropZoneId());
+
+                BigDecimal volumetricWeight = calculateVolumetricWeight(request);
+
+                BigDecimal chargeableWeight = request.actualWeightKg().max(volumetricWeight);
+
+                RateCard rateCard = rates
+                                .findByPickupZoneIdAndDropZoneIdAndOrderType(
+                                                pickupZone.getId(),
+                                                dropZone.getId(),
+                                                request.orderType())
+                                .orElseThrow(() -> new IllegalArgumentException(
+                                                "No rate card for the selected zones and order type"));
+
+                BigDecimal baseCharge = calculateBaseCharge(
+                                chargeableWeight,
+                                rateCard);
+
+                BigDecimal codSurcharge = calculateCodSurcharge(request);
+
+                DeliveryOrder order = new DeliveryOrder();
+
+                order.setCustomer(customer);
+                order.setPickupAddress(request.pickupAddress());
+                order.setDropAddress(request.dropAddress());
+
+                order.setPickupZone(pickupZone);
+                order.setDropZone(dropZone);
+
+                order.setLengthCm(request.lengthCm());
+                order.setWidthCm(request.widthCm());
+                order.setHeightCm(request.heightCm());
+
+                order.setActualWeightKg(request.actualWeightKg());
+                order.setVolumetricWeightKg(volumetricWeight);
+                order.setChargeableWeightKg(chargeableWeight);
+
+                order.setOrderType(request.orderType());
+                order.setPaymentType(request.paymentType());
+
+                order.setBaseCharge(baseCharge);
+                order.setCodSurcharge(codSurcharge);
+                order.setFinalCharge(
+                                baseCharge.add(codSurcharge));
+
+                order.setStatus(OrderStatus.PLACED);
+
+                order = orders.save(order);
+
+                addTrackingHistory(order, customer);
+
+                return mapToResponse(order);
+        }
+
+        public List<OrderResponse> mine(String email) {
+                User user = findUser(email);
+
+                if (user.getRole() == Role.DELIVERY_AGENT) {
+                        return orders
+                                        .findByDeliveryAgentIdOrderByUpdatedAtDesc(
+                                                        user.getId())
+                                        .stream()
+                                        .map(this::mapToResponse)
+                                        .toList();
+                }
+
+                if (user.getRole() == Role.ADMIN) {
+                        return orders
+                                        .findAll()
+                                        .stream()
+                                        .map(this::mapToResponse)
+                                        .toList();
+                }
+
+                return orders
+                                .findByCustomerIdOrderByCreatedAtDesc(
+                                                user.getId())
+                                .stream()
+                                .map(this::mapToResponse)
+                                .toList();
+        }
+
+        public OrderResponse get(
+                        String email,
+                        Long id) {
+                DeliveryOrder order = findOrder(id);
+
+                verifyOrderAccess(
+                                email,
+                                order);
+
+                return mapToResponse(order);
+        }
+
+        public OrderResponse transition(
+                        String email,
+                        Long id,
+                        StatusUpdateRequest request) {
+                DeliveryOrder order = findOrder(id);
+                User actor = findUser(email);
+
+                if (actor.getRole() == Role.DELIVERY_AGENT) {
+
+                        boolean assignedToActor = order.getDeliveryAgent() != null
+                                        && order.getDeliveryAgent()
+                                                        .getId()
+                                                        .equals(actor.getId());
+
+                        if (!assignedToActor) {
+                                throw new AccessDeniedException(
+                                                "Not assigned");
+                        }
+                }
+
+                if (!isAllowedTransition(
+                                order.getStatus(),
+                                request.status())) {
+                        throw new IllegalArgumentException(
+                                        "Invalid status transition");
+                }
+
+                order.setStatus(request.status());
+
+                if (request.status() == OrderStatus.FAILED
+                                || request.status() == OrderStatus.DELIVERED) {
+
+                        DeliveryAttempt attempt = new DeliveryAttempt();
+
+                        attempt.setOrder(order);
+                        attempt.setDeliveryAgent(actor);
+
+                        attempt.setAttemptNumber(
+                                        (int) attempts.countByOrderId(id) + 1);
+
+                        attempt.setStatus(
+                                        request.status() == OrderStatus.DELIVERED
+                                                        ? AttemptStatus.DELIVERED
+                                                        : AttemptStatus.FAILED);
+
+                        attempt.setFailureReason(
+                                        request.failureReason());
+
+                        attempts.save(attempt);
+                }
+
+                addTrackingHistory(order, actor);
+
+                return mapToResponse(order);
+        }
+
+        public OrderResponse assign(
+                        Long id,
+                        Long agentId,
+                        String email) {
+                DeliveryOrder order = findOrder(id);
+
+                User agent = users
+                                .findById(agentId)
+                                .orElseThrow(() -> new IllegalArgumentException(
+                                                "Delivery agent not found"));
+
+                if (agent.getRole() != Role.DELIVERY_AGENT) {
+                        throw new IllegalArgumentException(
+                                        "User is not a delivery agent");
+                }
+
+                order.setDeliveryAgent(agent);
+
+                addTrackingHistory(
+                                order,
+                                findUser(email));
+
+                return mapToResponse(order);
+        }
+
+        public List<OrderTrackingHistory> getTrackingHistory(
+                        String email,
+                        Long id) {
+                DeliveryOrder order = findOrder(id);
+
+                verifyOrderAccess(
+                                email,
+                                order);
+
+                return tracking
+                                .findByOrderIdOrderByCreatedAtAsc(id);
+        }
+
+        public List<DeliveryAttempt> getDeliveryAttempts(
+                        String email,
+                        Long id) {
+                DeliveryOrder order = findOrder(id);
+
+                verifyOrderAccess(
+                                email,
+                                order);
+
+                return attempts
+                                .findByOrderIdOrderByAttemptedAtDesc(id);
+        }
+
+        private BigDecimal calculateVolumetricWeight(
+                        CreateOrderRequest request) {
+                return request.lengthCm()
+                                .multiply(request.widthCm())
+                                .multiply(request.heightCm())
+                                .divide(
+                                                BigDecimal.valueOf(5000),
+                                                3,
+                                                RoundingMode.HALF_UP);
+        }
+
+        private BigDecimal calculateBaseCharge(
+                        BigDecimal chargeableWeight,
+                        RateCard rateCard) {
+                return chargeableWeight
+                                .multiply(rateCard.getRatePerKg())
+                                .max(rateCard.getMinimumCharge())
+                                .setScale(
+                                                2,
+                                                RoundingMode.HALF_UP);
+        }
+
+        private BigDecimal calculateCodSurcharge(
+                        CreateOrderRequest request) {
+                if (request.paymentType() != PaymentType.COD) {
+                        return BigDecimal.ZERO;
+                }
+
+                return cod
+                                .findByOrderType(request.orderType())
+                                .map(CodCharge::getSurcharge)
+                                .orElse(BigDecimal.ZERO);
+        }
+
+        private boolean isAllowedTransition(
+                        OrderStatus currentStatus,
+                        OrderStatus newStatus) {
+                return switch (currentStatus) {
+
+                        case PLACED, RESCHEDULED ->
+                                newStatus == OrderStatus.PICKED_UP;
+
+                        case PICKED_UP ->
+                                newStatus == OrderStatus.IN_TRANSIT;
+
+                        case IN_TRANSIT ->
+                                newStatus == OrderStatus.OUT_FOR_DELIVERY;
+
+                        case OUT_FOR_DELIVERY ->
+                                newStatus == OrderStatus.DELIVERED
+                                                || newStatus == OrderStatus.FAILED;
+
+                        case FAILED ->
+                                newStatus == OrderStatus.RESCHEDULED;
+
+                        default -> false;
+                };
+        }
+
+        private void addTrackingHistory(
+                        DeliveryOrder order,
+                        User actor) {
+                OrderTrackingHistory history = new OrderTrackingHistory();
+
+                history.setOrder(order);
+                history.setActor(actor);
+                history.setStatus(order.getStatus());
+
+                tracking.save(history);
+        }
+
+        private void verifyOrderAccess(
+                        String email,
+                        DeliveryOrder order) {
+                User user = findUser(email);
+
+                boolean isAdmin = user.getRole() == Role.ADMIN;
+
+                boolean isCustomer = order.getCustomer()
+                                .getId()
+                                .equals(user.getId());
+
+                boolean isAssignedAgent = order.getDeliveryAgent() != null
+                                && order.getDeliveryAgent()
+                                                .getId()
+                                                .equals(user.getId());
+
+                if (!isAdmin
+                                && !isCustomer
+                                && !isAssignedAgent) {
+
+                        throw new AccessDeniedException(
+                                        "Not permitted");
+                }
+        }
+
+        private User findUser(String email) {
+                return users
+                                .findByEmailIgnoreCase(email)
+                                .orElseThrow(() -> new IllegalArgumentException(
+                                                "User not found"));
+        }
+
+        private Zone findZone(Long id) {
+                return zones
+                                .findById(id)
+                                .orElseThrow(() -> new IllegalArgumentException(
+                                                "Zone not found"));
+        }
+
+        private DeliveryOrder findOrder(Long id) {
+                return orders
+                                .findById(id)
+                                .orElseThrow(() -> new IllegalArgumentException(
+                                                "Order not found"));
+        }
+
+        private OrderResponse mapToResponse(
+                        DeliveryOrder order) {
+                return new OrderResponse(
+                                order.getId(),
+                                order.getCustomer().getId(),
+                                order.getDeliveryAgent() == null
+                                                ? null
+                                                : order.getDeliveryAgent().getId(),
+                                order.getPickupAddress(),
+                                order.getDropAddress(),
+                                order.getPickupZone().getName(),
+                                order.getDropZone().getName(),
+                                order.getOrderType(),
+                                order.getPaymentType(),
+                                order.getStatus(),
+                                order.getChargeableWeightKg(),
+                                order.getFinalCharge(),
+                                order.getCreatedAt());
+        }
 }
