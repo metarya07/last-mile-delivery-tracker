@@ -45,10 +45,23 @@ export async function apiRequest(path, options = {}) {
   }
 
   if (response.status === 401) {
+    // Check if response contains a specific error message (e.g., from BadCredentialsException)
+    let message = null
+    try {
+      const errJson = await response.json()
+      message = errJson?.error || errJson?.message
+    } catch {
+      // Body wasn't JSON
+    }
+
+    if (path.includes('/api/auth/login')) {
+      throw new Error(message || 'Incorrect password or email. Please try again.')
+    }
+
     if (authFailureHandler) {
       authFailureHandler()
     }
-    throw new Error('Your session has expired or authentication failed. Please sign in again.')
+    throw new Error(message || 'Your session has expired or authentication failed. Please sign in again.')
   }
 
   if (!response.ok) {
