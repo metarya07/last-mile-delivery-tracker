@@ -6,15 +6,9 @@ import com.lastmile.delivery.entity.OrderType;
 import com.lastmile.delivery.entity.PaymentType;
 
 import jakarta.validation.constraints.DecimalMin;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 
-public record CreateOrderRequest(
-
-        @NotBlank @Size(max = 500) String pickupAddress,
-
-        @NotBlank @Size(max = 500) String dropAddress,
+public record RateEstimateRequest(
 
         @NotNull Long pickupZoneId,
 
@@ -30,9 +24,7 @@ public record CreateOrderRequest(
 
         @NotNull OrderType orderType,
 
-        @NotNull PaymentType paymentType,
-
-        Long customerId // Optional: specified when Admin creates order on behalf of customer
+        @NotNull PaymentType paymentType
 
 ) {
 }

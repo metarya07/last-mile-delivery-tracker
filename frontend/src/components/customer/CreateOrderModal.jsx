@@ -1,16 +1,10 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { orderApi } from '../../api/orderApi'
+import { rateApi } from '../../api/rateApi'
+import { formatCurrency } from '../../utils/formatters'
 import { Modal } from '../common/Modal'
 
-const DEFAULT_ZONES = [
-  { id: 1, name: 'Zone 1 - North Zone' },
-  { id: 2, name: 'Zone 2 - South Zone' },
-  { id: 3, name: 'Zone 3 - East Zone' },
-  { id: 4, name: 'Zone 4 - West Zone' },
-  { id: 5, name: 'Zone 5 - Central Zone' },
-]
-
-export function CreateOrderModal({ isOpen, onClose, onOrderCreated }) {
+export function CreateOrderModal({ isOpen, onClose, onOrderCreated, isAdmin = false }) {
   const [pickupAddress, setPickupAddress] = useState('')
   const [dropAddress, setDropAddress] = useState('')
   const [pickupZoneId, setPickupZoneId] = useState(1)
@@ -21,11 +15,27 @@ export function CreateOrderModal({ isOpen, onClose, onOrderCreated }) {
   const [actualWeightKg, setActualWeightKg] = useState(1.5)
   const [orderType, setOrderType] = useState('B2C')
   const [paymentType, setPaymentType] = useState('PREPAID')
+  const [targetCustomerId, setTargetCustomerId] = useState('')
 
+  const [zones, setZones] = useState([])
+  const [estimate, setEstimate] = useState(null)
+  const [estimating, setEstimating] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
-  // Client-side estimate of volumetric weight: (L * W * H) / 5000
+  // Load available zones
+  useEffect(() => {
+    if (!isOpen) return
+    rateApi.getZones().then((data) => {
+      if (data && data.length > 0) {
+        setZones(data)
+        if (!data.some((z) => z.id === pickupZoneId)) setPickupZoneId(data[0].id)
+        if (!data.some((z) => z.id === dropZoneId)) setDropZoneId(data[data.length > 1 ? 1 : 0].id)
+      }
+    }).catch(() => {})
+  }, [isOpen, pickupZoneId, dropZoneId])
+
+  // Volumetric weight: (L * W * H) / 5000
   const estimatedVolumetricWeight = useMemo(() => {
     const l = Number(lengthCm) || 0
     const w = Number(widthCm) || 0
@@ -41,6 +51,34 @@ export function CreateOrderModal({ isOpen, onClose, onOrderCreated }) {
     const vol = Number(estimatedVolumetricWeight) || 0
     return Math.max(act, vol).toFixed(3)
   }, [actualWeightKg, estimatedVolumetricWeight])
+
+  // Live server-side rate calculation estimate before confirming
+  useEffect(() => {
+    if (!isOpen || !pickupZoneId || !dropZoneId) return
+
+    const timer = setTimeout(async () => {
+      setEstimating(true)
+      try {
+        const est = await rateApi.estimateRate({
+          pickupZoneId: Number(pickupZoneId),
+          dropZoneId: Number(dropZoneId),
+          lengthCm: Number(lengthCm) || 10,
+          widthCm: Number(widthCm) || 10,
+          heightCm: Number(heightCm) || 10,
+          actualWeightKg: Number(actualWeightKg) || 0.5,
+          orderType,
+          paymentType,
+        })
+        setEstimate(est)
+      } catch {
+        setEstimate(null)
+      } finally {
+        setEstimating(false)
+      }
+    }, 250)
+
+    return () => clearTimeout(timer)
+  }, [isOpen, pickupZoneId, dropZoneId, lengthCm, widthCm, heightCm, actualWeightKg, orderType, paymentType])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -58,14 +96,15 @@ export function CreateOrderModal({ isOpen, onClose, onOrderCreated }) {
       actualWeightKg: Number(actualWeightKg),
       orderType,
       paymentType,
+      ...(isAdmin && targetCustomerId ? { customerId: Number(targetCustomerId) } : {}),
     }
 
     try {
       const created = await orderApi.createOrder(payload)
       onOrderCreated(created)
-      // Reset form
       setPickupAddress('')
       setDropAddress('')
+      setTargetCustomerId('')
       onClose()
     } catch (err) {
       setError(err.message || 'Failed to place delivery order.')
@@ -74,17 +113,38 @@ export function CreateOrderModal({ isOpen, onClose, onOrderCreated }) {
     }
   }
 
+  const zoneOptions = zones.length > 0 ? zones : [
+    { id: 1, name: 'Zone 1 - North Zone' },
+    { id: 2, name: 'Zone 2 - South Zone' },
+    { id: 3, name: 'Zone 3 - East Zone' },
+    { id: 4, name: 'Zone 4 - West Zone' },
+    { id: 5, name: 'Zone 5 - Central Zone' },
+  ]
+
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Create New Delivery Order"
-      subtitle="Customer Booking Desk"
-      maxWidth="620px"
+      title={isAdmin ? 'Create Order on Behalf of Customer' : 'Create New Delivery Order'}
+      subtitle={isAdmin ? 'Admin Booking Console' : 'Customer Booking Desk'}
+      maxWidth="640px"
     >
       {error && <div className="alert alert-error">{error}</div>}
 
       <form onSubmit={handleSubmit} className="modal-form">
+        {isAdmin && (
+          <label>
+            Customer User ID *
+            <input
+              type="number"
+              value={targetCustomerId}
+              onChange={(e) => setTargetCustomerId(e.target.value)}
+              placeholder="e.g. 2 (Customer account ID)"
+              required
+            />
+          </label>
+        )}
+
         <div className="form-grid-2">
           <label>
             Pickup Address
@@ -113,10 +173,10 @@ export function CreateOrderModal({ isOpen, onClose, onOrderCreated }) {
             Pickup Zone
             <select
               value={pickupZoneId}
-              onChange={(e) => setPickupZoneId(e.target.value)}
+              onChange={(e) => setPickupZoneId(Number(e.target.value))}
               required
             >
-              {DEFAULT_ZONES.map((z) => (
+              {zoneOptions.map((z) => (
                 <option key={z.id} value={z.id}>
                   {z.name}
                 </option>
@@ -127,10 +187,10 @@ export function CreateOrderModal({ isOpen, onClose, onOrderCreated }) {
             Drop Zone
             <select
               value={dropZoneId}
-              onChange={(e) => setDropZoneId(e.target.value)}
+              onChange={(e) => setDropZoneId(Number(e.target.value))}
               required
             >
-              {DEFAULT_ZONES.map((z) => (
+              {zoneOptions.map((z) => (
                 <option key={z.id} value={z.id}>
                   {z.name}
                 </option>
@@ -189,10 +249,10 @@ export function CreateOrderModal({ isOpen, onClose, onOrderCreated }) {
           </div>
           <div className="weight-estimation">
             <span>
-              Volumetric Weight: <strong>{estimatedVolumetricWeight} kg</strong>
+              Volumetric (L x W x H / 5000): <strong>{estimatedVolumetricWeight} kg</strong>
             </span>
             <span>
-              Chargeable Weight: <strong>{estimatedChargeableWeight} kg</strong>
+              Billable Weight: <strong>{estimatedChargeableWeight} kg</strong>
             </span>
           </div>
         </div>
@@ -214,12 +274,35 @@ export function CreateOrderModal({ isOpen, onClose, onOrderCreated }) {
           </label>
         </div>
 
+        {/* Live Fare Calculation Engine Breakdown */}
+        <div className="fare-calculation-box" style={{ background: 'var(--primary-subtle)', border: '1px solid var(--primary-border)', borderRadius: 'var(--radius-md)', padding: '12px 16px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+            <div>
+              <span className="eyebrow" style={{ color: 'var(--primary)', marginBottom: '2px' }}>AUTO-CALCULATED FARE BREAKDOWN</span>
+              <div style={{ fontSize: '12.5px', color: 'var(--text-muted)' }}>
+                {estimating ? 'Calculating rate...' : estimate ? (
+                  <span>
+                    Base: {formatCurrency(estimate.baseCharge)} (at {formatCurrency(estimate.ratePerKg)}/kg)
+                    {estimate.codSurcharge > 0 ? ` + COD: ${formatCurrency(estimate.codSurcharge)}` : ''}
+                  </span>
+                ) : 'Select zones & weight to view fare'}
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <span style={{ fontSize: '11px', color: 'var(--text-muted)', display: 'block' }}>Total Estimated Charge</span>
+              <strong style={{ fontSize: '1.25rem', color: 'var(--text-main)' }}>
+                {estimate ? formatCurrency(estimate.finalCharge) : 'Calculating...'}
+              </strong>
+            </div>
+          </div>
+        </div>
+
         <div className="form-actions">
           <button type="button" className="btn-secondary" onClick={onClose}>
             Cancel
           </button>
-          <button type="submit" disabled={busy} className="btn-primary">
-            {busy ? 'Placing Order...' : 'Place Delivery Order'}
+          <button type="submit" disabled={busy || estimating} className="btn-primary">
+            {busy ? 'Placing Order...' : 'Confirm & Place Order'}
           </button>
         </div>
       </form>

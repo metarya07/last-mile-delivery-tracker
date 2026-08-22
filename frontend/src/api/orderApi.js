@@ -2,7 +2,7 @@ import { apiRequest } from './client'
 
 export const orderApi = {
   /**
-   * Create a new order (CUSTOMER only)
+   * Create a new order (CUSTOMER or ADMIN on behalf of customer)
    * @param {Object} data
    * @param {string} data.pickupAddress
    * @param {string} data.dropAddress
@@ -14,6 +14,7 @@ export const orderApi = {
    * @param {number} data.actualWeightKg
    * @param {'B2B'|'B2C'} data.orderType
    * @param {'PREPAID'|'COD'} data.paymentType
+   * @param {number} [data.customerId]
    * @returns {Promise<Object>}
    */
   async createOrder(data) {
@@ -73,6 +74,32 @@ export const orderApi = {
   async assignAgent(orderId, agentId) {
     return apiRequest(`/api/orders/${orderId}/assign/${agentId}`, {
       method: 'POST',
+    })
+  },
+
+  /**
+   * Automatically detect and assign nearest/best available delivery agent (ADMIN only)
+   * @param {number|string} orderId
+   * @returns {Promise<Object>}
+   */
+  async autoAssign(orderId) {
+    return apiRequest(`/api/orders/${orderId}/auto-assign`, {
+      method: 'POST',
+    })
+  },
+
+  /**
+   * Reschedule a failed order for a new delivery attempt (CUSTOMER or ADMIN)
+   * @param {number|string} orderId
+   * @param {Object} [payload]
+   * @param {string} [payload.rescheduledDate]
+   * @param {string} [payload.notes]
+   * @returns {Promise<Object>}
+   */
+  async reschedule(orderId, payload = {}) {
+    return apiRequest(`/api/orders/${orderId}/reschedule`, {
+      method: 'POST',
+      body: JSON.stringify(payload),
     })
   },
 

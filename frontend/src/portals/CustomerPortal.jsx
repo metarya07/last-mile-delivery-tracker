@@ -6,6 +6,7 @@ import { MetricCard } from '../components/common/MetricCard'
 import { StatusBadge } from '../components/common/StatusBadge'
 import { CreateOrderModal } from '../components/customer/CreateOrderModal'
 import { CreateOrderView } from '../components/customer/CreateOrderView'
+import { RescheduleModal } from '../components/customer/RescheduleModal'
 import { OrderDetailModal } from '../components/tracking/OrderDetailModal'
 import { TrackingTimeline } from '../components/tracking/TrackingTimeline'
 import { DeliveryAttemptsList } from '../components/tracking/DeliveryAttemptsList'
@@ -53,6 +54,7 @@ export function CustomerPortal() {
   // Modals state
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [selectedOrderId, setSelectedOrderId] = useState(null)
+  const [rescheduleOrder, setRescheduleOrder] = useState(null)
   const [showForgotModal, setShowForgotModal] = useState(false)
 
   // Filters in My Orders tab
@@ -463,6 +465,16 @@ export function CustomerPortal() {
                           </td>
                           <td>
                             <div className="table-actions-group">
+                              {order.status === 'FAILED' && (
+                                <button
+                                  type="button"
+                                  className="btn-table-primary"
+                                  style={{ background: '#d97706', borderColor: '#d97706' }}
+                                  onClick={() => setRescheduleOrder(order)}
+                                >
+                                  Reschedule
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 className="btn-table-action"
@@ -595,6 +607,16 @@ export function CustomerPortal() {
                           </td>
                           <td>
                             <div className="table-actions-group">
+                              {order.status === 'FAILED' && (
+                                <button
+                                  type="button"
+                                  className="btn-table-primary"
+                                  style={{ background: '#d97706', borderColor: '#d97706' }}
+                                  onClick={() => setRescheduleOrder(order)}
+                                >
+                                  Reschedule
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 className="btn-table-action"
@@ -1033,6 +1055,17 @@ export function CustomerPortal() {
         isOpen={!!selectedOrderId}
         onClose={() => setSelectedOrderId(null)}
         orderId={selectedOrderId}
+      />
+
+      {/* Reschedule Order Modal */}
+      <RescheduleModal
+        isOpen={!!rescheduleOrder}
+        onClose={() => setRescheduleOrder(null)}
+        order={rescheduleOrder}
+        onRescheduled={(updated) => {
+          handleOrderCreated(updated)
+          setRescheduleOrder(null)
+        }}
       />
 
       {/* Password Reset Modal */}

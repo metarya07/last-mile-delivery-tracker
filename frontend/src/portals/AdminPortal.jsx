@@ -7,6 +7,8 @@ import { MetricCard } from '../components/common/MetricCard'
 import { StatusBadge } from '../components/common/StatusBadge'
 import { AssignAgentModal } from '../components/admin/AssignAgentModal'
 import { AgentListModal } from '../components/admin/AgentListModal'
+import { RateAndZoneManager } from '../components/admin/RateAndZoneManager'
+import { CreateOrderModal } from '../components/customer/CreateOrderModal'
 import { StatusTransitionModal } from '../components/agent/StatusTransitionModal'
 import { OrderDetailModal } from '../components/tracking/OrderDetailModal'
 import { TrackingTimeline } from '../components/tracking/TrackingTimeline'
@@ -24,15 +26,15 @@ import {
   IconSearch,
   IconAlert,
   IconCheck,
-  IconX,
   IconPartner,
   IconPhone,
+  IconPlus,
 } from '../components/common/Icons'
-import { formatCurrency, formatDate, formatShortDate } from '../utils/formatters'
+import { formatCurrency, formatShortDate } from '../utils/formatters'
 
 export function AdminPortal() {
   const { user, logout } = useAuth()
-  const [currentTab, setCurrentTab] = useState('dashboard') // 'dashboard' | 'orders' | 'assignments' | 'agents' | 'applications' | 'tracking'
+  const [currentTab, setCurrentTab] = useState('dashboard') // 'dashboard' | 'orders' | 'assignments' | 'rates' | 'agents' | 'applications' | 'tracking'
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   const [orders, setOrders] = useState([])
@@ -59,40 +61,46 @@ export function AdminPortal() {
   const [selectedOrderId, setSelectedOrderId] = useState(null)
   const [agentListOpen, setAgentListOpen] = useState(false)
   const [showForgotModal, setShowForgotModal] = useState(false)
+  const [createOrderOpen, setCreateOrderOpen] = useState(false)
+  const [autoAssigningId, setAutoAssigningId] = useState(null)
 
-  // Filters for Orders tab
+  // Filters in All Orders tab
   const [statusFilter, setStatusFilter] = useState('ALL')
-  const [agentFilter, setAgentFilter] = useState('ALL') // 'ALL' | 'ASSIGNED' | 'UNASSIGNED'
+  const [agentFilter, setAgentFilter] = useState('ALL')
+  const [zoneFilter, setZoneFilter] = useState('ALL')
   const [searchQuery, setSearchQuery] = useState('')
 
-  // Tracking tab specific state
-  const [trackingSearchId, setTrackingSearchId] = useState('')
+  // Tracking lookup tab state
+  const [trackingLookupId, setTrackingLookupId] = useState('')
   const [trackingSelectedOrder, setTrackingSelectedOrder] = useState(null)
   const [trackingHistoryList, setTrackingHistoryList] = useState([])
   const [trackingAttemptsList, setTrackingAttemptsList] = useState([])
   const [trackingLoading, setTrackingLoading] = useState(false)
   const [trackingError, setTrackingError] = useState('')
 
+  // Load all platform data
   useEffect(() => {
     let isMounted = true
+
     const fetchData = async () => {
       try {
-        const [orderList, agentList, appList, summaryData] = await Promise.all([
+        const [ordersData, agentsData, appsData, summaryData] = await Promise.all([
           orderApi.getMyOrders(),
           userApi.getDeliveryAgents().catch(() => []),
           deliveryPartnerApplicationApi.getAllApplications().catch(() => []),
           dashboardApi.getSummary().catch(() => ({})),
         ])
+
         if (isMounted) {
-          setOrders(orderList || [])
-          setAgents(agentList || [])
-          setApplications(appList || [])
+          setOrders(ordersData || [])
+          setAgents(agentsData || [])
+          setApplications(appsData || [])
           setSummary(summaryData || {})
           setError('')
         }
       } catch (err) {
         if (isMounted) {
-          setError(err.message || 'Failed to load system data.')
+          setError(err.message || 'Failed to load administrative overview.')
         }
       } finally {
         if (isMounted) {
@@ -118,6 +126,18 @@ export function AdminPortal() {
       prev.map((o) => (o.id === updatedOrder.id ? updatedOrder : o))
     )
     setRefreshIndex((prev) => prev + 1)
+  }
+
+  const handleAutoAssign = async (orderId) => {
+    setAutoAssigningId(orderId)
+    try {
+      const updated = await orderApi.autoAssign(orderId)
+      handleOrderUpdated(updated)
+    } catch (err) {
+      alert(err.message || 'Auto-assignment failed.')
+    } finally {
+      setAutoAssigningId(null)
+    }
   }
 
   const handleApproveApplication = async (appId) => {
@@ -169,6 +189,16 @@ export function AdminPortal() {
     )
   }, [orders])
 
+  // All unique zones for filter
+  const uniqueZones = useMemo(() => {
+    const set = new Set()
+    orders.forEach((o) => {
+      if (o.pickupZone) set.add(o.pickupZone)
+      if (o.dropZone) set.add(o.dropZone)
+    })
+    return Array.from(set)
+  }, [orders])
+
   // Filtered orders for All Orders tab
   const filteredOrders = useMemo(() => {
     return orders.filter((o) => {
@@ -176,7 +206,13 @@ export function AdminPortal() {
       const matchAgent =
         agentFilter === 'ALL' ||
         (agentFilter === 'UNASSIGNED' && !o.deliveryAgentId) ||
-        (agentFilter === 'ASSIGNED' && !!o.deliveryAgentId)
+        (agentFilter === 'ASSIGNED' && !!o.deliveryAgentId) ||
+        (o.deliveryAgentId?.toString() === agentFilter)
+
+      const matchZone =
+        zoneFilter === 'ALL' ||
+        o.pickupZone === zoneFilter ||
+        o.dropZone === zoneFilter
 
       const query = searchQuery.trim().toLowerCase()
       const matchQuery =
@@ -187,9 +223,9 @@ export function AdminPortal() {
         o.dropAddress?.toLowerCase().includes(query) ||
         o.pickupAddress?.toLowerCase().includes(query)
 
-      return matchStatus && matchAgent && matchQuery
+      return matchStatus && matchAgent && matchZone && matchQuery
     })
-  }, [orders, statusFilter, agentFilter, searchQuery])
+  }, [orders, statusFilter, agentFilter, zoneFilter, searchQuery])
 
   // Applications helpers
   const pendingApplications = useMemo(() => {
@@ -242,48 +278,27 @@ export function AdminPortal() {
     }
   }
 
-  const handleDeleteAgent = async (agentId, agentName) => {
-    if (!window.confirm(`Are you sure you want to remove user "${agentName}" (ID: ${agentId})?`)) {
-      return
-    }
-    try {
-      await userApi.deleteUser(agentId)
-      setAgents((prev) => prev.filter((a) => a.id !== agentId))
-      setRefreshIndex((prev) => prev + 1)
-    } catch (err) {
-      alert(err.message || 'Failed to remove user.')
-    }
-  }
-
   const switchTab = (tab) => {
     setCurrentTab(tab)
     setMobileNavOpen(false)
   }
 
   return (
-    <div className="shell admin-shell">
+    <div className="portal-shell">
       {/* Mobile Topbar */}
       <header className="mobile-topbar">
         <button
           type="button"
-          className="mobile-menu-btn"
+          className="mobile-nav-toggle"
           onClick={() => setMobileNavOpen((prev) => !prev)}
-          aria-label="Toggle navigation"
+          aria-label="Toggle navigation menu"
         >
           <IconMenu size={22} />
         </button>
-        <div className="mobile-topbar-brand">
-          <IconTruck size={20} className="brand-icon" />
-          <span>Control Center</span>
+        <div className="mobile-topbar-title">
+          <IconTruck size={20} />
+          <span>Admin Control Center</span>
         </div>
-        <button
-          type="button"
-          className="mobile-user-btn"
-          onClick={() => setShowForgotModal(true)}
-          aria-label="Security"
-        >
-          <IconUser size={18} />
-        </button>
       </header>
 
       {/* Backdrop for mobile drawer */}
@@ -336,6 +351,14 @@ export function AdminPortal() {
             </button>
             <button
               type="button"
+              className={`nav-link-btn ${currentTab === 'rates' ? 'active' : ''}`}
+              onClick={() => switchTab('rates')}
+            >
+              <IconPartner size={16} />
+              <span>Rate Cards & Zones</span>
+            </button>
+            <button
+              type="button"
               className={`nav-link-btn ${currentTab === 'agents' ? 'active' : ''}`}
               onClick={() => switchTab('agents')}
             >
@@ -369,9 +392,9 @@ export function AdminPortal() {
           <div className="user-profile-card">
             <p className="user-name">{user?.name}</p>
             <p className="user-email">{user?.email}</p>
-            <span className="user-role-pill">SYSTEM ADMIN</span>
+            <span className="badge-agent-assigned">ADMIN</span>
           </div>
-          <button type="button" className="btn-logout" onClick={logout}>
+          <button type="button" className="btn-secondary signout-btn" onClick={logout}>
             Sign Out
           </button>
         </div>
@@ -379,115 +402,96 @@ export function AdminPortal() {
 
       {/* Main Workspace Area */}
       <main className="workspace">
-        <header className="workspace-header">
+        <div className="workspace-header">
           <div>
-            <span className="role-tag">ADMIN PORTAL</span>
-            <h1>Central Dispatch Console</h1>
+            <span className="role-tag">PLATFORM ADMIN</span>
+            <h1>Operations Console</h1>
           </div>
           <div className="header-actions">
             <button
               type="button"
-              className="btn-secondary"
-              onClick={() => setShowForgotModal(true)}
+              className="btn-primary"
+              onClick={() => setCreateOrderOpen(true)}
             >
-              Account Security
+              <IconPlus size={15} />
+              <span>+ Create Order (On Behalf)</span>
+            </button>
+            <button type="button" className="btn-secondary" onClick={handleRefresh} disabled={loading}>
+              <IconRefresh size={14} />
+              <span>{loading ? 'Syncing...' : 'Refresh'}</span>
             </button>
             <button type="button" className="btn-secondary" onClick={logout}>
               Sign Out
             </button>
           </div>
-        </header>
+        </div>
 
-        {error && (
-          <div className="alert alert-error">
-            <IconAlert size={18} />
-            <span>{error}</span>
-          </div>
-        )}
+        {error && <div className="alert alert-error" style={{ marginBottom: '16px' }}>{error}</div>}
 
-        {/* TAB 1: ADMIN DASHBOARD */}
+        {/* TAB 1: DASHBOARD */}
         {currentTab === 'dashboard' && (
           <div className="dashboard-content">
-            <div className="section-toolbar">
-              <div>
-                <h2>Platform Metrics Overview</h2>
-                <p className="subtitle">System-wide parcel throughput, active fleet status, and fulfillment counters.</p>
-              </div>
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={handleRefresh}
-                disabled={loading}
-              >
-                <IconRefresh size={14} />
-                <span>{loading ? 'Refreshing...' : 'Refresh System Data'}</span>
-              </button>
-            </div>
-
-            {/* Metrics Overview */}
             <section className="metrics-grid">
-              <MetricCard label="Total Orders" value={summary.total ?? orders.length} />
-              <MetricCard label="In Transit" value={summary.IN_TRANSIT ?? 0} />
-              <MetricCard label="Delivered" value={summary.DELIVERED ?? 0} />
-              <MetricCard label="Needs Attention / Failed" value={summary.FAILED ?? 0} />
+              <MetricCard
+                label="TOTAL SHIPMENTS"
+                value={summary.totalOrders ?? orders.length}
+                trend="All active & historical orders"
+              />
+              <MetricCard
+                label="PENDING ASSIGNMENTS"
+                value={unassignedOrders.length}
+                trend="Awaiting agent allocation"
+              />
+              <MetricCard
+                label="IN TRANSIT / ACTIVE"
+                value={
+                  summary.inTransitOrders ??
+                  orders.filter((o) => ['PICKED_UP', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'].includes(o.status)).length
+                }
+                trend="Currently out with drivers"
+              />
+              <MetricCard
+                label="DELIVERED / COMPLETED"
+                value={
+                  summary.deliveredOrders ??
+                  orders.filter((o) => o.status === 'DELIVERED').length
+                }
+                trend="Successfully delivered"
+              />
             </section>
 
-            {/* Operations Attention Strip */}
-            <div className="dashboard-quick-actions">
-              {unassignedOrders.length > 0 ? (
-                <div className="panel action-alert-card">
-                  <div>
-                    <span className="live-pulse-badge">PENDING ALLOCATION</span>
-                    <h3>{unassignedOrders.length} Order(s) Awaiting Driver Assignment</h3>
-                    <p>Allocate delivery partners from the queue to start parcel pickups.</p>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    onClick={() => setCurrentTab('assignments')}
-                  >
-                    Open Assignment Queue
-                  </button>
-                </div>
-              ) : (
-                <div className="panel action-ok-card">
-                  <div>
-                    <span className="badge-agent-assigned">ROSTER BALANCED</span>
-                    <h3>All Active Orders Assigned</h3>
-                    <p>All active packages have been assigned to delivery agents.</p>
-                  </div>
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    onClick={() => setAgentListOpen(true)}
-                  >
-                    View Fleet Directory
-                  </button>
-                </div>
-              )}
-            </div>
+            {/* Quick Actions Panel */}
+            <section className="panel" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+              <div>
+                <p className="eyebrow">QUICK DISPATCH</p>
+                <h3 style={{ margin: 0 }}>Create New Order on Behalf of a Customer</h3>
+                <p style={{ color: 'var(--text-muted)', fontSize: '13px', margin: '4px 0 0' }}>
+                  Calculate volumetric rates and generate orders for registered customer IDs.
+                </p>
+              </div>
+              <button type="button" className="btn-primary" onClick={() => setCreateOrderOpen(true)}>
+                <IconPlus size={16} />
+                <span>Open Booking Console</span>
+              </button>
+            </section>
 
-            {/* Global Orders Panel */}
+            {/* Live Operations Feed */}
             <section className="panel">
               <div className="heading">
                 <div>
-                  <p className="eyebrow">RECENT ACTIVITY</p>
-                  <h2>Live Package Registry</h2>
+                  <p className="eyebrow">LIVE DISPATCH FEED</p>
+                  <h2>Recent Platform Activity</h2>
                 </div>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => setCurrentTab('orders')}
-                >
-                  View All Orders ({orders.length})
+                <button type="button" className="btn-secondary" onClick={() => switchTab('orders')}>
+                  View All ({orders.length})
                 </button>
               </div>
 
               {loading ? (
-                <p className="loading-state">Loading system-wide orders...</p>
+                <p className="loading-state">Loading real-time orders...</p>
               ) : orders.length === 0 ? (
                 <div className="empty-state">
-                  <p>No orders registered in the system yet.</p>
+                  <p>No orders currently placed on the platform.</p>
                 </div>
               ) : (
                 <div className="orders-table-wrapper">
@@ -496,7 +500,7 @@ export function AdminPortal() {
                       <tr>
                         <th>Order #</th>
                         <th>Customer</th>
-                        <th>Assigned Agent</th>
+                        <th>Agent</th>
                         <th>Route</th>
                         <th>Charge</th>
                         <th>Status</th>
@@ -536,13 +540,24 @@ export function AdminPortal() {
                           <td>
                             <div className="table-actions-group">
                               {!order.deliveryAgentId && (
-                                <button
-                                  type="button"
-                                  className="btn-table-primary"
-                                  onClick={() => setAssignModalOrder(order)}
-                                >
-                                  Assign
-                                </button>
+                                <>
+                                  <button
+                                    type="button"
+                                    className="btn-table-primary"
+                                    onClick={() => handleAutoAssign(order.id)}
+                                    disabled={autoAssigningId === order.id}
+                                    style={{ background: '#059669', borderColor: '#059669' }}
+                                  >
+                                    {autoAssigningId === order.id ? 'Auto...' : 'Auto-Assign'}
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn-table-primary"
+                                    onClick={() => setAssignModalOrder(order)}
+                                  >
+                                    Assign
+                                  </button>
+                                </>
                               )}
                               <button
                                 type="button"
@@ -569,7 +584,7 @@ export function AdminPortal() {
             <div className="section-toolbar">
               <div>
                 <h2>Central Orders Registry</h2>
-                <p className="subtitle">Search, filter, assign, and manage all platform shipments.</p>
+                <p className="subtitle">Search, filter, assign, and override any platform shipment.</p>
               </div>
               <button
                 type="button"
@@ -613,6 +628,21 @@ export function AdminPortal() {
                 <option value="ALL">All Assignments</option>
                 <option value="UNASSIGNED">Unassigned Only</option>
                 <option value="ASSIGNED">Assigned Only</option>
+                {agents.map((ag) => (
+                  <option key={ag.id} value={ag.id.toString()}>
+                    Agent: {ag.name} (#{ag.id})
+                  </option>
+                ))}
+              </select>
+              <select
+                value={zoneFilter}
+                onChange={(e) => setZoneFilter(e.target.value)}
+                className="filter-select"
+              >
+                <option value="ALL">All Zones</option>
+                {uniqueZones.map((z) => (
+                  <option key={z} value={z}>{z}</option>
+                ))}
               </select>
             </div>
 
@@ -675,14 +705,34 @@ export function AdminPortal() {
                           <td>
                             <div className="table-actions-group">
                               {!order.deliveryAgentId && (
-                                <button
-                                  type="button"
-                                  className="btn-table-primary"
-                                  onClick={() => setAssignModalOrder(order)}
-                                >
-                                  Assign
-                                </button>
+                                <>
+                                  <button
+                                    type="button"
+                                    className="btn-table-primary"
+                                    onClick={() => handleAutoAssign(order.id)}
+                                    disabled={autoAssigningId === order.id}
+                                    style={{ background: '#059669', borderColor: '#059669' }}
+                                    title="Detect nearest available agent"
+                                  >
+                                    Auto
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="btn-table-primary"
+                                    onClick={() => setAssignModalOrder(order)}
+                                  >
+                                    Assign
+                                  </button>
+                                </>
                               )}
+                              <button
+                                type="button"
+                                className="btn-table-action"
+                                onClick={() => setStatusModalOrder(order)}
+                                title="Override or advance status"
+                              >
+                                Override
+                              </button>
                               <button
                                 type="button"
                                 className="btn-table-action"
@@ -702,36 +752,27 @@ export function AdminPortal() {
           </div>
         )}
 
-        {/* TAB 3: UNASSIGNED ORDERS QUEUE */}
+        {/* TAB 3: ASSIGNMENTS QUEUE */}
         {currentTab === 'assignments' && (
           <div className="dashboard-content">
             <div className="section-toolbar">
               <div>
-                <h2>Assignments Dispatch Queue</h2>
-                <p className="subtitle">Allocate available delivery partners to incoming unassigned packages.</p>
+                <h2>Pending Dispatch & Assignment Queue</h2>
+                <p className="subtitle">Orders awaiting delivery partner allocation or automated assignment.</p>
               </div>
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={handleRefresh}
-                disabled={loading}
-              >
+              <button type="button" className="btn-secondary" onClick={handleRefresh} disabled={loading}>
                 <IconRefresh size={14} />
-                <span>{loading ? 'Refreshing...' : 'Refresh Queue'}</span>
+                <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
               </button>
             </div>
 
             <section className="panel">
-              <div className="heading">
-                <div>
-                  <p className="eyebrow">UNASSIGNED PACKAGES</p>
-                  <h2>Ready for Agent Assignment ({unassignedOrders.length})</h2>
-                </div>
-              </div>
-
-              {unassignedOrders.length === 0 ? (
+              {loading ? (
+                <p className="loading-state">Checking unassigned runs...</p>
+              ) : unassignedOrders.length === 0 ? (
                 <div className="empty-state">
-                  <p>All active orders have been assigned to delivery agents!</p>
+                  <IconCheck size={48} className="empty-icon" />
+                  <p>Assignment queue is clear! All active orders have been assigned to delivery agents.</p>
                 </div>
               ) : (
                 <div className="orders-table-wrapper">
@@ -739,40 +780,54 @@ export function AdminPortal() {
                     <thead>
                       <tr>
                         <th>Order #</th>
-                        <th>Customer ID</th>
-                        <th>Pickup & Drop Location</th>
-                        <th>Weight & Specs</th>
+                        <th>Customer</th>
+                        <th>Route</th>
+                        <th>Chargeable Weight</th>
                         <th>Charge</th>
-                        <th>Status</th>
-                        <th>Action</th>
+                        <th>Placed At</th>
+                        <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {unassignedOrders.map((order) => (
                         <tr key={order.id}>
                           <td><strong>#{order.id}</strong></td>
-                          <td>User #{order.customerId}</td>
+                          <td><span>User #{order.customerId}</span></td>
                           <td>
                             <div className="route-cell">
                               <span className="route-zones">{order.pickupZone} &rarr; {order.dropZone}</span>
-                              <span className="route-address">{order.pickupAddress} &rarr; {order.dropAddress}</span>
+                              <span className="route-address" title={order.dropAddress}>{order.dropAddress}</span>
                             </div>
                           </td>
-                          <td>
-                            <span className="badge-meta">
-                              {order.chargeableWeightKg != null ? `${order.chargeableWeightKg} kg` : ''} - {order.orderType}
-                            </span>
-                          </td>
+                          <td><span>{order.chargeableWeightKg} kg</span></td>
                           <td><strong>{formatCurrency(order.finalCharge)}</strong></td>
-                          <td><StatusBadge status={order.status} /></td>
+                          <td><span className="time-text">{formatShortDate(order.createdAt)}</span></td>
                           <td>
-                            <button
-                              type="button"
-                              className="btn-table-primary"
-                              onClick={() => setAssignModalOrder(order)}
-                            >
-                              Assign Driver
-                            </button>
+                            <div className="table-actions-group">
+                              <button
+                                type="button"
+                                className="btn-table-primary"
+                                onClick={() => handleAutoAssign(order.id)}
+                                disabled={autoAssigningId === order.id}
+                                style={{ background: '#059669', borderColor: '#059669' }}
+                              >
+                                {autoAssigningId === order.id ? 'Auto...' : 'Auto-Assign'}
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-table-primary"
+                                onClick={() => setAssignModalOrder(order)}
+                              >
+                                Manual Assign
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-table-action"
+                                onClick={() => setSelectedOrderId(order.id)}
+                              >
+                                Details
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       ))}
@@ -784,119 +839,106 @@ export function AdminPortal() {
           </div>
         )}
 
-        {/* TAB 4: DELIVERY AGENTS (FLEET) */}
+        {/* TAB 4: RATE CARDS & ZONES MANAGEMENT */}
+        {currentTab === 'rates' && (
+          <div className="dashboard-content">
+            <RateAndZoneManager />
+          </div>
+        )}
+
+        {/* TAB 5: DELIVERY AGENTS FLEET */}
         {currentTab === 'agents' && (
           <div className="dashboard-content">
             <div className="section-toolbar">
               <div>
-                <h2>Delivery Agents Fleet Directory</h2>
-                <p className="subtitle">Manage delivery partner roster, check online availability, and contact info.</p>
+                <h2>Delivery Agents Fleet</h2>
+                <p className="subtitle">Manage partner accounts, duty status, and fleet assignments.</p>
               </div>
               <button
                 type="button"
                 className="btn-secondary"
-                onClick={handleRefresh}
-                disabled={loading}
+                onClick={() => setAgentListOpen(true)}
               >
-                <IconRefresh size={14} />
-                <span>{loading ? 'Refreshing...' : 'Refresh Fleet'}</span>
+                <IconPhone size={14} />
+                <span>Contact Directory</span>
               </button>
             </div>
 
             <section className="panel">
-              <div className="heading">
-                <div>
-                  <p className="eyebrow">ACTIVE FLEET</p>
-                  <h2>Available Delivery Agents ({agents.length})</h2>
+              {loading ? (
+                <p className="loading-state">Loading agents fleet...</p>
+              ) : agents.length === 0 ? (
+                <div className="empty-state">
+                  <p>No delivery agents found in system registry.</p>
                 </div>
-              </div>
-
-              {agents.length === 0 ? (
-                <p className="empty-state-notice">
-                  No delivery agents are currently available/online in the fleet.
-                </p>
               ) : (
-                <div className="agent-directory-list">
-                  {agents.map((agent) => (
-                    <div key={agent.id} className="agent-row">
-                      <div className="agent-info">
-                        <span className={`dot ${agent.available ? 'dot-online' : 'dot-offline'}`} />
-                        <div>
-                          <strong>{agent.name}</strong>
-                          <span className="agent-meta">
-                            {agent.email}
-                            {agent.phone && (
-                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: '6px' }}>
-                                <IconPhone size={12} /> {agent.phone}
-                              </span>
-                            )}
-                            {' '}- ID #{agent.id}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="table-actions-group">
-                        <button
-                          type="button"
-                          className="btn-danger-outline"
-                          onClick={() => handleDeleteAgent(agent.id, agent.name)}
-                          title="Remove user"
-                        >
-                          Remove Agent
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                <div className="orders-table-wrapper">
+                  <table className="orders-table">
+                    <thead>
+                      <tr>
+                        <th>Agent ID</th>
+                        <th>Full Name</th>
+                        <th>Email</th>
+                        <th>Phone</th>
+                        <th>Duty Status</th>
+                        <th>Role</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {agents.map((agent) => (
+                        <tr key={agent.id}>
+                          <td><strong>#{agent.id}</strong></td>
+                          <td><strong>{agent.name}</strong></td>
+                          <td><span>{agent.email}</span></td>
+                          <td><span>{agent.phone || 'N/A'}</span></td>
+                          <td>
+                            <span className={agent.available ? 'badge-agent-assigned' : 'badge-meta'}>
+                              {agent.available ? '● Online (Ready)' : '○ Offline'}
+                            </span>
+                          </td>
+                          <td><span className="badge-meta">{agent.role}</span></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </section>
           </div>
         )}
 
-        {/* TAB 4.5: DELIVERY PARTNER APPLICATIONS */}
+        {/* TAB 6: PARTNER APPLICATIONS */}
         {currentTab === 'applications' && (
           <div className="dashboard-content">
             <div className="section-toolbar">
               <div>
                 <h2>Delivery Partner Applications</h2>
-                <p className="subtitle">Review driver credential submissions, verify licenses, and approve role promotions.</p>
+                <p className="subtitle">Review customer applications to become verified delivery partners.</p>
               </div>
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={handleRefresh}
-                disabled={loading}
-              >
+              <button type="button" className="btn-secondary" onClick={handleRefresh} disabled={loading}>
                 <IconRefresh size={14} />
-                <span>{loading ? 'Refreshing...' : 'Refresh Applications'}</span>
+                <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
               </button>
             </div>
 
             {appActionError && (
-              <div className="alert alert-error">
-                <IconAlert size={18} />
+              <div className="alert alert-error" style={{ marginBottom: '16px' }}>
+                <IconAlert size={16} />
                 <span>{appActionError}</span>
               </div>
             )}
             {appActionSuccess && (
-              <div className="alert alert-success">
-                <IconCheck size={18} />
+              <div className="alert alert-success" style={{ marginBottom: '16px' }}>
+                <IconCheck size={16} />
                 <span>{appActionSuccess}</span>
               </div>
             )}
 
-            {/* Applications Metric Row */}
-            <section className="metrics-grid">
-              <MetricCard label="Total Applications" value={applications.length} />
-              <MetricCard label="Pending Review" value={pendingApplications.length} />
-              <MetricCard label="Approved Partners" value={applications.filter((a) => a.status === 'APPROVED').length} />
-              <MetricCard label="Rejected" value={applications.filter((a) => a.status === 'REJECTED').length} />
-            </section>
-
-            {/* Filter bar */}
+            {/* Filter Bar */}
             <div className="filter-bar">
               <input
                 type="text"
-                placeholder="Search by Applicant Name, Email, License, or Vehicle..."
+                placeholder="Search by Applicant Name, Email, Vehicle #, or License..."
                 value={appSearchQuery}
                 onChange={(e) => setAppSearchQuery(e.target.value)}
                 className="search-input"
@@ -906,25 +948,19 @@ export function AdminPortal() {
                 onChange={(e) => setAppStatusFilter(e.target.value)}
                 className="filter-select"
               >
-                <option value="ALL">All Application States</option>
-                <option value="PENDING">Pending Review Only</option>
-                <option value="APPROVED">Approved Only</option>
-                <option value="REJECTED">Rejected Only</option>
+                <option value="ALL">All Application Statuses ({applications.length})</option>
+                <option value="PENDING">Pending Review ({pendingApplications.length})</option>
+                <option value="APPROVED">Approved</option>
+                <option value="REJECTED">Rejected</option>
               </select>
             </div>
 
-            {/* Applications Registry Table */}
             <section className="panel">
-              <div className="heading">
-                <div>
-                  <p className="eyebrow">DRIVER APPLICANT REGISTRY</p>
-                  <h2>Partner Submissions ({filteredApplications.length})</h2>
-                </div>
-              </div>
-
-              {filteredApplications.length === 0 ? (
+              {loading ? (
+                <p className="loading-state">Loading partner applications...</p>
+              ) : filteredApplications.length === 0 ? (
                 <div className="empty-state">
-                  <p>No delivery partner applications matching filter criteria.</p>
+                  <p>No partner applications match the selected criteria.</p>
                 </div>
               ) : (
                 <div className="orders-table-wrapper">
@@ -932,14 +968,13 @@ export function AdminPortal() {
                     <thead>
                       <tr>
                         <th>App #</th>
-                        <th>Applicant Details</th>
-                        <th>Vehicle Type & No.</th>
-                        <th>Driving License</th>
-                        <th>Preferred Zone</th>
+                        <th>Applicant</th>
+                        <th>Vehicle</th>
+                        <th>License #</th>
+                        <th>Preferred Area</th>
+                        <th>Submitted</th>
                         <th>Status</th>
-                        <th>Submitted At</th>
-                        <th>Reviewer Info</th>
-                        <th>Admin Decision</th>
+                        <th>Review Actions</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -947,80 +982,56 @@ export function AdminPortal() {
                         <tr key={app.id}>
                           <td><strong>#{app.id}</strong></td>
                           <td>
-                            <div className="route-cell">
+                            <div>
                               <strong>{app.applicantName}</strong>
-                              <span className="route-address" title={app.applicantEmail}>{app.applicantEmail}</span>
-                              {app.applicantPhone && (
-                                <span className="time-text" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                  <IconPhone size={11} /> {app.applicantPhone}
-                                </span>
-                              )}
-                            </div>
-                          </td>
-                          <td>
-                            <div className="route-cell">
-                              <span className="badge-meta">{app.vehicleType}</span>
-                              <span className="time-text">{app.vehicleNumber || 'No plate provided'}</span>
-                            </div>
-                          </td>
-                          <td>
-                            <strong>{app.drivingLicense}</strong>
-                          </td>
-                          <td>
-                            <span className="badge-meta">{app.preferredArea || 'All Zones'}</span>
-                          </td>
-                          <td>
-                            <StatusBadge status={app.status} />
-                          </td>
-                          <td>
-                            <span className="time-text">
-                              {formatShortDate(app.createdAt)}
-                            </span>
-                          </td>
-                          <td>
-                            {app.reviewedByName ? (
-                              <div className="route-cell">
-                                <span className="time-text">By: {app.reviewedByName}</span>
-                                {app.rejectionReason && (
-                                  <span className="rejection-reason-chip" title={app.rejectionReason}>
-                                    Note: {app.rejectionReason}
-                                  </span>
-                                )}
+                              <div style={{ fontSize: '11px', color: 'var(--text-muted)' }}>
+                                {app.applicantEmail}
                               </div>
-                            ) : (
-                              <span className="time-text">Awaiting Review</span>
-                            )}
+                            </div>
                           </td>
+                          <td>
+                            <div>
+                              <span className="badge-meta">{app.vehicleType}</span>
+                              <div style={{ fontSize: '12px', fontWeight: 600, marginTop: '2px' }}>
+                                {app.vehicleNumber}
+                              </div>
+                            </div>
+                          </td>
+                          <td><code>{app.drivingLicense}</code></td>
+                          <td><span>{app.preferredArea}</span></td>
+                          <td><span className="time-text">{formatShortDate(app.createdAt)}</span></td>
+                          <td><StatusBadge status={app.status} /></td>
                           <td>
                             {app.status === 'PENDING' ? (
                               <div className="table-actions-group">
                                 <button
                                   type="button"
                                   className="btn-table-primary"
-                                  style={{ background: '#16a34a', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                                   onClick={() => handleApproveApplication(app.id)}
                                   disabled={approveBusyId === app.id}
                                 >
-                                  <IconCheck size={14} />
-                                  <span>{approveBusyId === app.id ? 'Approving...' : 'Approve'}</span>
+                                  {approveBusyId === app.id ? 'Approving...' : 'Approve'}
                                 </button>
                                 <button
                                   type="button"
-                                  className="btn-danger-outline"
+                                  className="btn-table-action"
+                                  style={{ color: '#dc2626', borderColor: '#fca5a5' }}
                                   onClick={() => {
                                     setRejectingApp(app)
                                     setRejectionReason('')
                                   }}
-                                  style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                                 >
-                                  <IconX size={14} />
-                                  <span>Reject</span>
+                                  Reject
                                 </button>
                               </div>
                             ) : app.status === 'APPROVED' ? (
-                              <span className="badge-agent-assigned">Promoted to Agent</span>
+                              <span style={{ fontSize: '12px', color: 'var(--success)', fontWeight: 600 }}>
+                                Verified Partner
+                              </span>
                             ) : (
-                              <span className="badge-agent-unassigned">Rejected</span>
+                              <span style={{ fontSize: '12px', color: 'var(--error)', fontWeight: 600 }}>
+                                Rejected: {app.rejectionReason || 'No reason specified'}
+                              </span>
                             )}
                           </td>
                         </tr>
@@ -1033,90 +1044,90 @@ export function AdminPortal() {
           </div>
         )}
 
-        {/* TAB 5: TRACKING & AUDIT */}
+        {/* TAB 7: TRACKING & AUDIT */}
         {currentTab === 'tracking' && (
           <div className="dashboard-content">
             <div className="section-toolbar">
               <div>
-                <h2>Universal Tracking & Audit</h2>
-                <p className="subtitle">Audit lifecycle status changes, actor fingerprints, and delivery attempts.</p>
+                <h2>Central Tracking & Audit Trail</h2>
+                <p className="subtitle">Audit state transitions, milestone actors, and delivery attempts.</p>
               </div>
             </div>
 
-            <div className="panel tracking-search-panel">
+            <section className="panel" style={{ marginBottom: '20px' }}>
               <form
                 onSubmit={(e) => {
                   e.preventDefault()
-                  performTrackingLookup(trackingSearchId)
+                  performTrackingLookup(trackingLookupId)
                 }}
-                className="tracking-search-form"
+                className="tracking-search-bar"
               >
-                <label>
-                  Enter Any Order ID to Inspect:
-                  <div className="search-bar-row">
-                    <input
-                      type="number"
-                      placeholder="e.g. 1"
-                      value={trackingSearchId}
-                      onChange={(e) => setTrackingSearchId(e.target.value)}
-                      required
-                    />
-                    <button type="submit" className="btn-primary" disabled={trackingLoading}>
-                      <IconSearch size={16} />
-                      <span>{trackingLoading ? 'Inspecting...' : 'Inspect Audit Log'}</span>
-                    </button>
-                  </div>
-                </label>
+                <input
+                  type="number"
+                  placeholder="Enter Order ID to inspect (e.g. 101)..."
+                  value={trackingLookupId}
+                  onChange={(e) => setTrackingLookupId(e.target.value)}
+                  className="search-input"
+                  required
+                />
+                <button type="submit" className="btn-primary" disabled={trackingLoading}>
+                  <IconSearch size={15} />
+                  <span>{trackingLoading ? 'Searching...' : 'Audit Order'}</span>
+                </button>
               </form>
-            </div>
 
-            {trackingError && (
-              <div className="alert alert-error">
-                <IconAlert size={18} />
-                <span>{trackingError}</span>
-              </div>
-            )}
+              {trackingError && <div className="alert alert-error" style={{ marginTop: '12px' }}>{trackingError}</div>}
+            </section>
 
             {trackingSelectedOrder && (
-              <div className="panel tracking-result-panel">
-                <div className="order-summary-strip">
-                  <div>
-                    <span className="label">Order Status</span>
-                    <div style={{ marginTop: '4px' }}>
-                      <StatusBadge status={trackingSelectedOrder.status} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div className="panel">
+                  <div className="heading">
+                    <div>
+                      <p className="eyebrow">ORDER SUMMARY</p>
+                      <h3>Order #{trackingSelectedOrder.id} Details</h3>
+                    </div>
+                    <StatusBadge status={trackingSelectedOrder.status} />
+                  </div>
+                  <div className="info-grid">
+                    <div>
+                      <span className="label">Pickup Location</span>
+                      <span className="value">{trackingSelectedOrder.pickupAddress} ({trackingSelectedOrder.pickupZone})</span>
+                    </div>
+                    <div>
+                      <span className="label">Delivery Destination</span>
+                      <span className="value">{trackingSelectedOrder.dropAddress} ({trackingSelectedOrder.dropZone})</span>
+                    </div>
+                    <div>
+                      <span className="label">Total Charge</span>
+                      <span className="value">{formatCurrency(trackingSelectedOrder.finalCharge)}</span>
+                    </div>
+                    <div>
+                      <span className="label">Assigned Agent</span>
+                      <span className="value">
+                        {trackingSelectedOrder.deliveryAgentId ? `Agent #${trackingSelectedOrder.deliveryAgentId}` : 'Unassigned'}
+                      </span>
                     </div>
                   </div>
-                  <div>
-                    <span className="label">Assigned Agent</span>
-                    <strong>{trackingSelectedOrder.deliveryAgentId ? `Agent #${trackingSelectedOrder.deliveryAgentId}` : 'Unassigned'}</strong>
-                  </div>
-                  <div className="summary-charge">
-                    <span className="label">Final Charge</span>
-                    <strong>{formatCurrency(trackingSelectedOrder.finalCharge)}</strong>
-                  </div>
                 </div>
 
-                <div className="order-details-grid">
-                  <div className="detail-card">
-                    <h4>Route & Customer</h4>
-                    <p><strong>Customer ID:</strong> User #{trackingSelectedOrder.customerId}</p>
-                    <p><strong>Pickup:</strong> {trackingSelectedOrder.pickupAddress} ({trackingSelectedOrder.pickupZone})</p>
-                    <p><strong>Drop:</strong> {trackingSelectedOrder.dropAddress} ({trackingSelectedOrder.dropZone})</p>
+                <div className="panel">
+                  <div className="heading">
+                    <div>
+                      <p className="eyebrow">AUDIT TRAIL</p>
+                      <h3>State Transition History</h3>
+                    </div>
                   </div>
-
-                  <div className="detail-card">
-                    <h4>Logistics Specs</h4>
-                    <p><strong>Type:</strong> {trackingSelectedOrder.orderType} - {trackingSelectedOrder.paymentType}</p>
-                    <p><strong>Billable Weight:</strong> {trackingSelectedOrder.chargeableWeightKg != null ? `${trackingSelectedOrder.chargeableWeightKg} kg` : 'N/A'}</p>
-                    <p><strong>Created Date:</strong> {formatDate(trackingSelectedOrder.createdAt)}</p>
-                  </div>
+                  <TrackingTimeline trackingHistory={trackingHistoryList} />
                 </div>
 
-                <div style={{ marginTop: '24px' }}>
-                  <TrackingTimeline history={trackingHistoryList} />
-                </div>
-
-                <div style={{ marginTop: '24px' }}>
+                <div className="panel">
+                  <div className="heading">
+                    <div>
+                      <p className="eyebrow">ATTEMPTS</p>
+                      <h3>Delivery Attempts Recorded</h3>
+                    </div>
+                  </div>
                   <DeliveryAttemptsList attempts={trackingAttemptsList} />
                 </div>
               </div>
@@ -1125,87 +1136,100 @@ export function AdminPortal() {
         )}
       </main>
 
-      {/* Assign Agent Modal */}
+      {/* MODALS */}
+      <CreateOrderModal
+        isOpen={createOrderOpen}
+        onClose={() => setCreateOrderOpen(false)}
+        onOrderCreated={(newOrder) => {
+          handleOrderUpdated(newOrder)
+          setRefreshIndex((r) => r + 1)
+        }}
+        isAdmin={true}
+      />
+
       <AssignAgentModal
         isOpen={!!assignModalOrder}
         onClose={() => setAssignModalOrder(null)}
         order={assignModalOrder}
-        onAssigned={handleOrderUpdated}
+        agents={agents}
+        onAssigned={(updated) => {
+          handleOrderUpdated(updated)
+          setAssignModalOrder(null)
+        }}
       />
 
-      {/* Status Transition Modal */}
       <StatusTransitionModal
         isOpen={!!statusModalOrder}
         onClose={() => setStatusModalOrder(null)}
         order={statusModalOrder}
-        onStatusUpdated={handleOrderUpdated}
+        onStatusUpdated={(updated) => {
+          handleOrderUpdated(updated)
+          setStatusModalOrder(null)
+        }}
       />
 
-      {/* Order Detail Modal */}
       <OrderDetailModal
         isOpen={!!selectedOrderId}
         onClose={() => setSelectedOrderId(null)}
         orderId={selectedOrderId}
       />
 
-      {/* Fleet Directory Modal */}
       <AgentListModal
         isOpen={agentListOpen}
         onClose={() => setAgentListOpen(false)}
+        agents={agents}
       />
 
-      {/* Password Reset Modal */}
       <ForgotPasswordModal
         isOpen={showForgotModal}
         onClose={() => setShowForgotModal(false)}
-        initialEmail={user?.email || ''}
+        initialEmail={user?.email}
       />
 
       {/* Reject Application Modal */}
       <Modal
         isOpen={!!rejectingApp}
-        onClose={() => setRejectingApp(null)}
-        title={rejectingApp ? `Reject Application #${rejectingApp.id}` : 'Reject Partner Application'}
-        subtitle={rejectingApp ? `Applicant: ${rejectingApp.applicantName}` : 'Driver Credential Review'}
+        onClose={() => {
+          setRejectingApp(null)
+          setRejectionReason('')
+        }}
+        title="Reject Delivery Partner Application"
+        subtitle={`Application #${rejectingApp?.id} - ${rejectingApp?.applicantName}`}
         maxWidth="500px"
       >
-        {rejectingApp && (
-          <form onSubmit={handleRejectApplication} className="modal-form">
-            <p className="form-description">
-              Please specify the reason for rejecting <strong>{rejectingApp.applicantName}</strong>&apos;s application. The applicant will see this feedback and may reapply.
-            </p>
-
-            <label>
-              Rejection Reason *
-              <textarea
-                rows={3}
-                value={rejectionReason}
-                onChange={(e) => setRejectionReason(e.target.value)}
-                placeholder="e.g. Driving license copy is unreadable / vehicle not eligible in requested zone"
-                required
-                autoFocus
-              />
-            </label>
-
-            <div className="form-actions">
-              <button
-                type="button"
-                className="btn-secondary"
-                onClick={() => setRejectingApp(null)}
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={rejectBusy || !rejectionReason.trim()}
-                className="btn-primary"
-                style={{ background: '#b91c1c', borderColor: '#b91c1c' }}
-              >
-                {rejectBusy ? 'Rejecting...' : 'Confirm Rejection'}
-              </button>
-            </div>
-          </form>
-        )}
+        <form onSubmit={handleRejectApplication} className="modal-form">
+          <label>
+            Reason for Rejection *
+            <textarea
+              rows={3}
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+              placeholder="e.g. Invalid driving license document, vehicle details incomplete"
+              required
+              autoFocus
+            />
+          </label>
+          <div className="form-actions">
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => {
+                setRejectingApp(null)
+                setRejectionReason('')
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="btn-primary"
+              style={{ background: '#dc2626', borderColor: '#dc2626' }}
+              disabled={rejectBusy || !rejectionReason.trim()}
+            >
+              {rejectBusy ? 'Rejecting...' : 'Confirm Rejection'}
+            </button>
+          </div>
+        </form>
       </Modal>
     </div>
   )

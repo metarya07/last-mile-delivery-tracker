@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.lastmile.delivery.dto.request.CreateOrderRequest;
+import com.lastmile.delivery.dto.request.RescheduleOrderRequest;
 import com.lastmile.delivery.dto.request.StatusUpdateRequest;
 import com.lastmile.delivery.dto.response.DeliveryAttemptResponse;
 import com.lastmile.delivery.dto.response.OrderResponse;
@@ -27,87 +28,111 @@ import jakarta.validation.Valid;
 @RequestMapping("/api/orders")
 public class OrderController {
 
-        private final OrderService orderService;
+    private final OrderService orderService;
 
-        public OrderController(OrderService orderService) {
-                this.orderService = orderService;
-        }
+    public OrderController(OrderService orderService) {
+        this.orderService = orderService;
+    }
 
-        @PostMapping
-        @PreAuthorize("hasRole('CUSTOMER')")
-        public ResponseEntity<OrderResponse> createOrder(
-                        Authentication authentication,
-                        @Valid @RequestBody CreateOrderRequest request) {
+    @PostMapping
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
+    public ResponseEntity<OrderResponse> createOrder(
+            Authentication authentication,
+            @Valid @RequestBody CreateOrderRequest request) {
 
-                OrderResponse response = orderService.create(
-                                authentication.getName(),
-                                request);
+        OrderResponse response = orderService.create(
+                authentication.getName(),
+                request);
 
-                return ResponseEntity
-                                .status(HttpStatus.CREATED)
-                                .body(response);
-        }
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(response);
+    }
 
-        @GetMapping
-        public List<OrderResponse> getMyOrders(
-                        Authentication authentication) {
+    @GetMapping
+    public List<OrderResponse> getMyOrders(
+            Authentication authentication) {
 
-                return orderService.mine(authentication.getName());
-        }
+        return orderService.mine(authentication.getName());
+    }
 
-        @GetMapping("/{id}")
-        public OrderResponse getOrder(
-                        Authentication authentication,
-                        @PathVariable Long id) {
+    @GetMapping("/{id}")
+    public OrderResponse getOrder(
+            Authentication authentication,
+            @PathVariable Long id) {
 
-                return orderService.get(
-                                authentication.getName(),
-                                id);
-        }
+        return orderService.get(
+                authentication.getName(),
+                id);
+    }
 
-        @PatchMapping("/{id}/status")
-        @PreAuthorize("hasAnyRole('ADMIN', 'DELIVERY_AGENT')")
-        public OrderResponse updateStatus(
-                        Authentication authentication,
-                        @PathVariable Long id,
-                        @Valid @RequestBody StatusUpdateRequest request) {
+    @PatchMapping("/{id}/status")
+    @PreAuthorize("hasAnyRole('ADMIN', 'DELIVERY_AGENT')")
+    public OrderResponse updateStatus(
+            Authentication authentication,
+            @PathVariable Long id,
+            @Valid @RequestBody StatusUpdateRequest request) {
 
-                return orderService.transition(
-                                authentication.getName(),
-                                id,
-                                request);
-        }
+        return orderService.transition(
+                authentication.getName(),
+                id,
+                request);
+    }
 
-        @PostMapping("/{id}/assign/{agentId}")
-        @PreAuthorize("hasRole('ADMIN')")
-        public OrderResponse assignAgent(
-                        Authentication authentication,
-                        @PathVariable Long id,
-                        @PathVariable Long agentId) {
+    @PostMapping("/{id}/assign/{agentId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public OrderResponse assignAgent(
+            Authentication authentication,
+            @PathVariable Long id,
+            @PathVariable Long agentId) {
 
-                return orderService.assign(
-                                id,
-                                agentId,
-                                authentication.getName());
-        }
+        return orderService.assign(
+                id,
+                agentId,
+                authentication.getName());
+    }
 
-        @GetMapping("/{id}/tracking")
-        public List<TrackingHistoryResponse> getTrackingHistory(
-                        Authentication authentication,
-                        @PathVariable Long id) {
+    @PostMapping("/{id}/auto-assign")
+    @PreAuthorize("hasRole('ADMIN')")
+    public OrderResponse autoAssignAgent(
+            Authentication authentication,
+            @PathVariable Long id) {
 
-                return orderService.getTrackingHistory(
-                                authentication.getName(),
-                                id);
-        }
+        return orderService.autoAssign(
+                id,
+                authentication.getName());
+    }
 
-        @GetMapping("/{id}/attempts")
-        public List<DeliveryAttemptResponse> getDeliveryAttempts(
-                        Authentication authentication,
-                        @PathVariable Long id) {
+    @PostMapping("/{id}/reschedule")
+    @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
+    public OrderResponse rescheduleOrder(
+            Authentication authentication,
+            @PathVariable Long id,
+            @RequestBody(required = false) RescheduleOrderRequest request) {
 
-                return orderService.getDeliveryAttempts(
-                                authentication.getName(),
-                                id);
-        }
+        return orderService.reschedule(
+                id,
+                authentication.getName(),
+                request != null ? request : new RescheduleOrderRequest(null, null));
+    }
+
+    @GetMapping("/{id}/tracking")
+    public List<TrackingHistoryResponse> getTrackingHistory(
+            Authentication authentication,
+            @PathVariable Long id) {
+
+        return orderService.getTrackingHistory(
+                authentication.getName(),
+                id);
+    }
+
+    @GetMapping("/{id}/attempts")
+    public List<DeliveryAttemptResponse> getDeliveryAttempts(
+            Authentication authentication,
+            @PathVariable Long id) {
+
+        return orderService.getDeliveryAttempts(
+                authentication.getName(),
+                id);
+    }
 }
