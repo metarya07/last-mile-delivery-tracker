@@ -3,7 +3,6 @@ const getBaseUrl = () => {
   if (envUrl && envUrl !== 'http://localhost:8080') {
     return envUrl
   }
-  // If loaded over public HTTPS (like Vercel) or remote mobile device, use the active public HTTPS backend tunnel
   if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
     return 'https://acid-canola-cesarean.ngrok-free.dev'
   }
@@ -39,14 +38,18 @@ export async function apiRequest(path, options = {}) {
     }
   }
 
+  // Only standard headers to prevent CORS preflight header rejection
   const headers = {
     'Content-Type': 'application/json',
-    'ngrok-skip-browser-warning': 'true',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...options.headers,
   }
 
-  const url = `${BASE_URL}${path}`
+  let url = `${BASE_URL}${path}`
+  if (url.includes('ngrok')) {
+    url += (url.includes('?') ? '&' : '?') + 'ngrok-skip-browser-warning=69420'
+  }
+
   let response
 
   try {
@@ -61,7 +64,6 @@ export async function apiRequest(path, options = {}) {
   }
 
   if (response.status === 401) {
-    // Check if response contains a specific error message (e.g., from BadCredentialsException)
     let message = null
     try {
       const errJson = await response.json()
