@@ -20,6 +20,8 @@ import com.lastmile.delivery.repository.UserRepository;
 
 import jakarta.validation.Valid;
 
+import org.springframework.web.bind.annotation.RequestParam;
+
 @RestController
 @RequestMapping("/api/users")
 public class UserController {
@@ -32,10 +34,14 @@ public class UserController {
 
     @GetMapping("/delivery-agents")
     @PreAuthorize("hasRole('ADMIN')")
-    public List<UserResponse> getAvailableDeliveryAgents() {
+    public List<UserResponse> getDeliveryAgents(
+            @RequestParam(required = false) Boolean available) {
 
-        return userRepository
-                .findByRoleAndAvailableTrue(Role.DELIVERY_AGENT)
+        List<User> agents = (available != null && available)
+                ? userRepository.findByRoleAndAvailableTrue(Role.DELIVERY_AGENT)
+                : userRepository.findByRole(Role.DELIVERY_AGENT);
+
+        return agents
                 .stream()
                 .map(this::toResponse)
                 .toList();

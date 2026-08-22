@@ -1,0 +1,100 @@
+import { apiRequest } from './client'
+
+export const orderApi = {
+  /**
+   * Create a new order (CUSTOMER only)
+   * @param {Object} data
+   * @param {string} data.pickupAddress
+   * @param {string} data.dropAddress
+   * @param {number} data.pickupZoneId
+   * @param {number} data.dropZoneId
+   * @param {number} data.lengthCm
+   * @param {number} data.widthCm
+   * @param {number} data.heightCm
+   * @param {number} data.actualWeightKg
+   * @param {'B2B'|'B2C'} data.orderType
+   * @param {'PREPAID'|'COD'} data.paymentType
+   * @returns {Promise<Object>}
+   */
+  async createOrder(data) {
+    return apiRequest('/api/orders', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    })
+  },
+
+  /**
+   * Get orders relevant to current authenticated user
+   * (CUSTOMER: own orders, DELIVERY_AGENT: assigned orders, ADMIN: all orders)
+   * @returns {Promise<Array<Object>>}
+   */
+  async getMyOrders() {
+    return apiRequest('/api/orders', {
+      method: 'GET',
+    })
+  },
+
+  /**
+   * Get single order details by ID
+   * @param {number|string} id
+   * @returns {Promise<Object>}
+   */
+  async getOrderById(id) {
+    return apiRequest(`/api/orders/${id}`, {
+      method: 'GET',
+    })
+  },
+
+  /**
+   * Update order status (ADMIN or assigned DELIVERY_AGENT)
+   * @param {number|string} id
+   * @param {Object} payload
+   * @param {string} payload.status
+   * @param {string} [payload.failureReason]
+   * @returns {Promise<Object>}
+   */
+  async updateStatus(id, { status, failureReason }) {
+    const body = { status }
+    if (failureReason) {
+      body.failureReason = failureReason
+    }
+    return apiRequest(`/api/orders/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    })
+  },
+
+  /**
+   * Assign delivery agent to order (ADMIN only)
+   * @param {number|string} orderId
+   * @param {number|string} agentId
+   * @returns {Promise<Object>}
+   */
+  async assignAgent(orderId, agentId) {
+    return apiRequest(`/api/orders/${orderId}/assign/${agentId}`, {
+      method: 'POST',
+    })
+  },
+
+  /**
+   * Get order tracking history
+   * @param {number|string} id
+   * @returns {Promise<Array<{id: number, orderId: number, status: string, actorId: number|null, actorName: string|null, createdAt: string}>>}
+   */
+  async getTrackingHistory(id) {
+    return apiRequest(`/api/orders/${id}/tracking`, {
+      method: 'GET',
+    })
+  },
+
+  /**
+   * Get order delivery attempts
+   * @param {number|string} id
+   * @returns {Promise<Array<{id: number, orderId: number, deliveryAgentId: number|null, deliveryAgentName: string|null, attemptNumber: number, status: string, failureReason: string|null, attemptedAt: string}>>}
+   */
+  async getDeliveryAttempts(id) {
+    return apiRequest(`/api/orders/${id}/attempts`, {
+      method: 'GET',
+    })
+  },
+}

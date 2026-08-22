@@ -86,7 +86,9 @@ public class OrderService {
                                 .orElseThrow(() -> new IllegalArgumentException(
                                                 "No rate card for the selected zones and order type"));
 
-                BigDecimal baseCharge = calculateBaseCharge(chargeableWeight, rateCard);
+                BigDecimal baseCharge = calculateBaseCharge(
+                                chargeableWeight,
+                                rateCard);
 
                 BigDecimal codSurcharge = calculateCodSurcharge(request);
 
@@ -126,6 +128,7 @@ public class OrderService {
         }
 
         public List<OrderResponse> mine(String email) {
+
                 User user = findUser(email);
 
                 if (user.getRole() == Role.DELIVERY_AGENT) {
@@ -420,8 +423,11 @@ public class OrderService {
 
                 return switch (currentStatus) {
 
-                        case PLACED, RESCHEDULED ->
+                        case PLACED ->
                                 newStatus == OrderStatus.PICKED_UP;
+
+                        case RESCHEDULED ->
+                                newStatus == OrderStatus.OUT_FOR_DELIVERY;
 
                         case PICKED_UP ->
                                 newStatus == OrderStatus.IN_TRANSIT;
@@ -481,6 +487,7 @@ public class OrderService {
         }
 
         private User findUser(String email) {
+
                 return users
                                 .findByEmailIgnoreCase(email.trim())
                                 .orElseThrow(() -> new IllegalArgumentException(
@@ -488,6 +495,7 @@ public class OrderService {
         }
 
         private Zone findZone(Long id) {
+
                 return zones
                                 .findById(id)
                                 .orElseThrow(() -> new IllegalArgumentException(
@@ -495,6 +503,7 @@ public class OrderService {
         }
 
         private DeliveryOrder findOrder(Long id) {
+
                 return orders
                                 .findById(id)
                                 .orElseThrow(() -> new IllegalArgumentException(
