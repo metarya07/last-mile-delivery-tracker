@@ -2,8 +2,10 @@ package com.lastmile.delivery.dto.request;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 
-public record LoginRequest(
+public record VerifyOtpRequest(
         @NotBlank @Email String email,
-        @NotBlank String password) {
+
+        @NotBlank @Pattern(regexp = "\\d{6}", message = "OTP must be 6 digits") String otp) {
 }

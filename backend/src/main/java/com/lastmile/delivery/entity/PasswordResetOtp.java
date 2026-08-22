@@ -12,30 +12,35 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "zone_areas", uniqueConstraints = @UniqueConstraint(columnNames = { "zone_id", "area_name" }))
+@Table(name = "password_reset_otps")
 @Getter
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
-public class ZoneArea {
+public class PasswordResetOtp {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "zone_id", nullable = false)
-    private Zone zone;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
-    @Column(name = "area_name", nullable = false, length = 150)
-    private String areaName;
+    @Column(name = "otp_hash", nullable = false, length = 255)
+    private String otpHash;
+
+    @Column(name = "expires_at", nullable = false)
+    private Instant expiresAt;
+
+    @Column(nullable = false)
+    private boolean used;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;

@@ -16,87 +16,127 @@ import com.lastmile.delivery.security.JwtService;
 @Service
 public class AuthService {
 
-    private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
-    private final JwtService jwtService;
+        private final UserRepository userRepository;
+        private final PasswordEncoder passwordEncoder;
+        private final JwtService jwtService;
+        private final EmailService emailService;
 
-    public AuthService(
-            UserRepository userRepository,
-            PasswordEncoder passwordEncoder,
-            JwtService jwtService) {
-        this.userRepository = userRepository;
-        this.passwordEncoder = passwordEncoder;
-        this.jwtService = jwtService;
-    }
+        public AuthService(
+                        UserRepository userRepository,
+                        PasswordEncoder passwordEncoder,
+                        JwtService jwtService,
+                        EmailService emailService) {
 
-    public AuthResponse register(RegisterRequest request) {
-
-        if (userRepository.existsByEmailIgnoreCase(request.email())) {
-            throw new IllegalArgumentException(
-                    "Email is already registered");
+                this.userRepository = userRepository;
+                this.passwordEncoder = passwordEncoder;
+                this.jwtService = jwtService;
+                this.emailService = emailService;
         }
 
-        User user = new User();
+        public AuthResponse register(RegisterRequest request) {
+                String email = request.email().trim().toLowerCase();
 
-        user.setName(request.name());
-        user.setEmail(
-                request.email()
-                        .trim()
-                        .toLowerCase());
-        user.setPassword(
-                passwordEncoder.encode(request.password()));
-        user.setPhone(request.phone());
-        user.setRole(Role.CUSTOMER);
+                if (userRepository.existsByEmailIgnoreCase(email)) {
+                        throw new IllegalArgumentException(
+                                        "Email is already registered");
+                }
 
-        return createResponse(
-                userRepository.save(user));
-    }
+                User user = new User();
+                user.setName(request.name());
+                user.setEmail(email);
+                user.setPassword(
+                                passwordEncoder.encode(request.password()));
+                user.setPhone(request.phone());
+                user.setRole(Role.CUSTOMER);
 
-    public AuthResponse login(LoginRequest request) {
+                User savedUser = userRepository.save(user);
 
-        User user = userRepository
-                .findByEmailIgnoreCase(request.email())
-                .orElseThrow(() -> new BadCredentialsException(
-                        "Invalid credentials"));
+                sendWelcomeEmail(savedUser);
 
-        if (!passwordEncoder.matches(
-                request.password(),
-                user.getPassword())) {
-            throw new BadCredentialsException(
-                    "Invalid credentials");
+                return createResponse(savedUser);
         }
 
-        return createResponse(user);
-    }
+        public AuthResponse login(LoginRequest request) {
+                String email = request.email().trim();
 
-    public AuthResponse profile(String email) {
+                User user = userRepository
+                                .findByEmailIgnoreCase(email)
+                                .orElseThrow(() -> new BadCredentialsException(
+                                                "Invalid credentials"));
 
-        User user = userRepository
-                .findByEmailIgnoreCase(email)
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "User not found"));
+                if (!passwordEncoder.matches(
+                                request.password(),
+                                user.getPassword())) {
 
-        return createResponse(user);
-    }
+                        throw new BadCredentialsException(
+                                        "Invalid credentials");
+                }
 
-    private AuthResponse createResponse(User user) {
+                return createResponse(user);
+        }
 
-        UserDetails userDetails = org.springframework.security.core.userdetails.User
-                .withUsername(user.getEmail())
-                .password(user.getPassword())
-                .authorities(
-                        "ROLE_" + user.getRole().name())
-                .build();
+        public AuthResponse profile(String email) {
+                User user = userRepository
+                                .findByEmailIgnoreCase(email.trim())
+                                .orElseThrow(() -> new IllegalArgumentException(
+                                                "User not found"));
 
-        String token = jwtService.generateToken(
-                userDetails,
-                user.getRole().name());
+                return createResponse(user);
+        }
 
-        return new AuthResponse(
-                token,
-                user.getId(),
-                user.getName(),
-                user.getEmail(),
-                user.getRole());
-    }
+        private void sendWelcomeEmail(User user) {
+                String subject = "Welcome to Last Mile Delivery Tracker";
+
+                String message = """
+                                Hello %s,
+
+                                Welcome to Last Mile Delivery Tracker.
+
+                                Your customer account has been successfully created.
+
+                                Registered email: %s
+
+                                You can now log in and start using the delivery tracking system.
+
+                                Regards,
+
+                                Last Mile Delivery Tracker
+                                """.formatted(
+                                user.getName(),
+                                user.getEmail());
+
+                try {
+                        emailService.sendEmail(
+                                        user.getEmail(),
+                                        subject,
+                                        message);
+
+                        System.out.println(
+                                        "Welcome email sent to " + user.getEmail());
+
+                } catch (RuntimeException exception) {
+                        System.err.println(
+                                        "Failed to send welcome email to "
+                                                        + user.getEmail());
+                }
+        }
+
+        private AuthResponse createResponse(User user) {
+                UserDetails userDetails = org.springframework.security.core.userdetails.User
+                                .withUsername(user.getEmail())
+                                .password(user.getPassword())
+                                .authorities("ROLE_" + user.getRole().name())
+                                .build();
+
+                String token = jwtService.generateToken(
+                                userDetails,
+                                user.getRole().name());
+
+                return new AuthResponse(
+                                token,
+                                user.getId(),
+                                user.getName(),
+                                user.getEmail(),
+                                user.getRole());
+        }
 }

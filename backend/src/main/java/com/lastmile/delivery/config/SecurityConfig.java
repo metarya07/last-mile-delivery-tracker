@@ -26,111 +26,106 @@ import com.lastmile.delivery.security.JwtAuthenticationFilter;
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
-    private final String allowedOrigin;
+        private final JwtAuthenticationFilter jwtAuthenticationFilter;
+        private final String allowedOrigin;
 
-    public SecurityConfig(
-            JwtAuthenticationFilter jwtAuthenticationFilter,
-            @Value("${app.cors.allowed-origin}") String allowedOrigin
-    ) {
-        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
-        this.allowedOrigin = allowedOrigin;
-    }
+        public SecurityConfig(
+                        JwtAuthenticationFilter jwtAuthenticationFilter,
+                        @Value("${app.cors.allowed-origin}") String allowedOrigin) {
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
+                this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+                this.allowedOrigin = allowedOrigin;
+        }
 
-    @Bean
-    public SecurityFilterChain securityFilterChain(
-            HttpSecurity http
-    ) throws Exception {
+        @Bean
+        public PasswordEncoder passwordEncoder() {
+                return new BCryptPasswordEncoder();
+        }
 
-        http
-                .csrf(csrf -> csrf.disable())
+        @Bean
+        public SecurityFilterChain securityFilterChain(
+                        HttpSecurity http) throws Exception {
 
-                .cors(cors -> cors.configurationSource(
-                        corsConfigurationSource()
-                ))
+                http
+                                .csrf(csrf -> csrf.disable())
 
-                .sessionManagement(session ->
-                        session.sessionCreationPolicy(
-                                SessionCreationPolicy.STATELESS
-                        )
-                )
+                                .cors(cors -> cors.configurationSource(
+                                                corsConfigurationSource()))
 
-                .authorizeHttpRequests(auth -> auth
+                                .sessionManagement(session -> session.sessionCreationPolicy(
+                                                SessionCreationPolicy.STATELESS))
 
-                        .requestMatchers(
-                                HttpMethod.POST,
-                                "/api/auth/login",
-                                "/api/auth/register"
-                        ).permitAll()
+                                .authorizeHttpRequests(auth -> auth
 
-                        .requestMatchers(
-                                HttpMethod.OPTIONS,
-                                "/**"
-                        ).permitAll()
+                                                // Public authentication endpoints
+                                                .requestMatchers(
+                                                                HttpMethod.POST,
+                                                                "/api/auth/login",
+                                                                "/api/auth/register",
+                                                                "/api/auth/forgot-password",
+                                                                "/api/auth/verify-otp",
+                                                                "/api/auth/reset-password")
+                                                .permitAll()
 
-                        .requestMatchers("/error").permitAll()
+                                                // Temporary SMS testing endpoint
+                                                .requestMatchers(
+                                                                HttpMethod.POST,
+                                                                "/api/test/sms")
+                                                .permitAll()
 
-                        .anyRequest().authenticated()
-                )
+                                                // CORS preflight
+                                                .requestMatchers(
+                                                                HttpMethod.OPTIONS,
+                                                                "/**")
+                                                .permitAll()
 
-                .exceptionHandling(exception ->
-                        exception.authenticationEntryPoint(
-                                (request, response, authException) ->
-                                        response.sendError(
-                                                HttpStatus.UNAUTHORIZED.value()
-                                        )
-                        )
-                )
+                                                // Error endpoint
+                                                .requestMatchers("/error")
+                                                .permitAll()
 
-                .addFilterBefore(
-                        jwtAuthenticationFilter,
-                        UsernamePasswordAuthenticationFilter.class
-                );
+                                                // Everything else requires authentication
+                                                .anyRequest()
+                                                .authenticated())
 
-        return http.build();
-    }
+                                .exceptionHandling(exception -> exception.authenticationEntryPoint(
+                                                (request, response, authException) -> response.sendError(
+                                                                HttpStatus.UNAUTHORIZED.value())))
 
-    @Bean
-    public CorsConfigurationSource corsConfigurationSource() {
+                                .addFilterBefore(
+                                                jwtAuthenticationFilter,
+                                                UsernamePasswordAuthenticationFilter.class);
 
-        CorsConfiguration configuration =
-                new CorsConfiguration();
+                return http.build();
+        }
 
-        configuration.setAllowedOrigins(
-                List.of(allowedOrigin)
-        );
+        @Bean
+        public CorsConfigurationSource corsConfigurationSource() {
 
-        configuration.setAllowedMethods(
-                List.of(
-                        "GET",
-                        "POST",
-                        "PUT",
-                        "PATCH",
-                        "DELETE",
-                        "OPTIONS"
-                )
-        );
+                CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.setAllowedHeaders(
-                List.of(
-                        "Authorization",
-                        "Content-Type"
-                )
-        );
+                configuration.setAllowedOrigins(
+                                List.of(allowedOrigin));
 
-        UrlBasedCorsConfigurationSource source =
-                new UrlBasedCorsConfigurationSource();
+                configuration.setAllowedMethods(
+                                List.of(
+                                                "GET",
+                                                "POST",
+                                                "PUT",
+                                                "PATCH",
+                                                "DELETE",
+                                                "OPTIONS"));
 
-        source.registerCorsConfiguration(
-                "/**",
-                configuration
-        );
+                configuration.setAllowedHeaders(
+                                List.of(
+                                                "Authorization",
+                                                "Content-Type"));
 
-        return source;
-    }
+                UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+
+                source.registerCorsConfiguration(
+                                "/**",
+                                configuration);
+
+                return source;
+        }
 }

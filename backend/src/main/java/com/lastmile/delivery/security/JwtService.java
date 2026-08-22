@@ -17,19 +17,28 @@ import io.jsonwebtoken.security.Keys;
 @Service
 public class JwtService {
 
-    private final String secret;
+    private final SecretKey signingKey;
     private final long expiration;
 
     public JwtService(
             @Value("${jwt.secret}") String secret,
             @Value("${jwt.expiration}") long expiration) {
-        this.secret = secret;
+
+        byte[] secretBytes = secret.getBytes(StandardCharsets.UTF_8);
+
+        if (secretBytes.length < 32) {
+            throw new IllegalStateException(
+                    "jwt.secret must be at least 32 characters long");
+        }
+
+        this.signingKey = Keys.hmacShaKeyFor(secretBytes);
         this.expiration = expiration;
     }
 
     public String generateToken(
             UserDetails user,
             String role) {
+
         Date issuedAt = new Date();
 
         Date expirationDate = Date.from(
@@ -40,7 +49,7 @@ public class JwtService {
                 .claim("role", role)
                 .issuedAt(issuedAt)
                 .expiration(expirationDate)
-                .signWith(getSigningKey())
+                .signWith(signingKey)
                 .compact();
     }
 
@@ -51,6 +60,7 @@ public class JwtService {
     public boolean valid(
             String token,
             UserDetails user) {
+
         Claims claims = getClaims(token);
 
         return claims.getSubject()
@@ -60,20 +70,9 @@ public class JwtService {
 
     private Claims getClaims(String token) {
         return Jwts.parser()
-                .verifyWith(getSigningKey())
+                .verifyWith(signingKey)
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
-    }
-
-    private SecretKey getSigningKey() {
-        byte[] secretBytes = secret.getBytes(StandardCharsets.UTF_8);
-
-        if (secretBytes.length < 32) {
-            throw new IllegalStateException(
-                    "JWT_SECRET must be at least 32 characters long");
-        }
-
-        return Keys.hmacShaKeyFor(secretBytes);
     }
 }

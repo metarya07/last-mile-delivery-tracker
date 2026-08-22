@@ -32,8 +32,8 @@ public class DashboardController {
 
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'DELIVERY_AGENT', 'CUSTOMER')")
-    public Map<String, Long> summary(Authentication authentication) {
-
+    public Map<String, Long> summary(
+            Authentication authentication) {
         User user = userRepository
                 .findByEmailIgnoreCase(authentication.getName())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
@@ -46,10 +46,11 @@ public class DashboardController {
     }
 
     private Map<String, Long> adminSummary() {
-
         Map<String, Long> result = new LinkedHashMap<>();
 
-        result.put("total", orderRepository.count());
+        result.put(
+                "total",
+                orderRepository.count());
 
         for (OrderStatus status : OrderStatus.values()) {
             result.put(
@@ -60,18 +61,18 @@ public class DashboardController {
         return result;
     }
 
-    private Map<String, Long> deliveryAgentSummary(Long agentId) {
-
-        List<DeliveryOrder> orders = orderRepository
-                .findByDeliveryAgentIdOrderByUpdatedAtDesc(agentId);
+    private Map<String, Long> deliveryAgentSummary(
+            Long agentId) {
+        List<DeliveryOrder> orders = orderRepository.findByDeliveryAgentIdOrderByUpdatedAtDesc(
+                agentId);
 
         return createSummary(orders);
     }
 
-    private Map<String, Long> customerSummary(Long customerId) {
-
-        List<DeliveryOrder> orders = orderRepository
-                .findByCustomerIdOrderByCreatedAtDesc(customerId);
+    private Map<String, Long> customerSummary(
+            Long customerId) {
+        List<DeliveryOrder> orders = orderRepository.findByCustomerIdOrderByCreatedAtDesc(
+                customerId);
 
         return createSummary(orders);
     }
@@ -80,14 +81,18 @@ public class DashboardController {
             List<DeliveryOrder> orders) {
         Map<String, Long> result = new LinkedHashMap<>();
 
-        result.put("total", (long) orders.size());
+        result.put(
+                "total",
+                (long) orders.size());
 
         for (OrderStatus status : OrderStatus.values()) {
             long count = orders.stream()
                     .filter(order -> order.getStatus() == status)
                     .count();
 
-            result.put(status.name(), count);
+            result.put(
+                    status.name(),
+                    count);
         }
 
         return result;

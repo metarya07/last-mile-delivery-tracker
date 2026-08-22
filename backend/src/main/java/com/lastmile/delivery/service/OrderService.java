@@ -10,7 +10,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import com.lastmile.delivery.dto.request.CreateOrderRequest;
 import com.lastmile.delivery.dto.request.StatusUpdateRequest;
+import com.lastmile.delivery.dto.response.DeliveryAttemptResponse;
 import com.lastmile.delivery.dto.response.OrderResponse;
+import com.lastmile.delivery.dto.response.TrackingHistoryResponse;
 import com.lastmile.delivery.entity.AttemptStatus;
 import com.lastmile.delivery.entity.CodCharge;
 import com.lastmile.delivery.entity.DeliveryAttempt;
@@ -41,6 +43,7 @@ public class OrderService {
         private final CodChargeRepository cod;
         private final OrderTrackingHistoryRepository tracking;
         private final DeliveryAttemptRepository attempts;
+        private final EmailService emailService;
 
         public OrderService(
                         DeliveryOrderRepository orders,
@@ -49,7 +52,9 @@ public class OrderService {
                         RateCardRepository rates,
                         CodChargeRepository cod,
                         OrderTrackingHistoryRepository tracking,
-                        DeliveryAttemptRepository attempts) {
+                        DeliveryAttemptRepository attempts,
+                        EmailService emailService) {
+
                 this.orders = orders;
                 this.users = users;
                 this.zones = zones;
@@ -57,11 +62,13 @@ public class OrderService {
                 this.cod = cod;
                 this.tracking = tracking;
                 this.attempts = attempts;
+                this.emailService = emailService;
         }
 
         public OrderResponse create(
                         String email,
                         CreateOrderRequest request) {
+
                 User customer = findUser(email);
 
                 Zone pickupZone = findZone(request.pickupZoneId());
@@ -79,9 +86,7 @@ public class OrderService {
                                 .orElseThrow(() -> new IllegalArgumentException(
                                                 "No rate card for the selected zones and order type"));
 
-                BigDecimal baseCharge = calculateBaseCharge(
-                                chargeableWeight,
-                                rateCard);
+                BigDecimal baseCharge = calculateBaseCharge(chargeableWeight, rateCard);
 
                 BigDecimal codSurcharge = calculateCodSurcharge(request);
 
@@ -107,14 +112,15 @@ public class OrderService {
 
                 order.setBaseCharge(baseCharge);
                 order.setCodSurcharge(codSurcharge);
-                order.setFinalCharge(
-                                baseCharge.add(codSurcharge));
+                order.setFinalCharge(baseCharge.add(codSurcharge));
 
                 order.setStatus(OrderStatus.PLACED);
 
                 order = orders.save(order);
 
                 addTrackingHistory(order, customer);
+
+                sendStatusNotification(order);
 
                 return mapToResponse(order);
         }
@@ -124,24 +130,21 @@ public class OrderService {
 
                 if (user.getRole() == Role.DELIVERY_AGENT) {
                         return orders
-                                        .findByDeliveryAgentIdOrderByUpdatedAtDesc(
-                                                        user.getId())
+                                        .findByDeliveryAgentIdOrderByUpdatedAtDesc(user.getId())
                                         .stream()
                                         .map(this::mapToResponse)
                                         .toList();
                 }
 
                 if (user.getRole() == Role.ADMIN) {
-                        return orders
-                                        .findAll()
+                        return orders.findAll()
                                         .stream()
                                         .map(this::mapToResponse)
                                         .toList();
                 }
 
                 return orders
-                                .findByCustomerIdOrderByCreatedAtDesc(
-                                                user.getId())
+                                .findByCustomerIdOrderByCreatedAtDesc(user.getId())
                                 .stream()
                                 .map(this::mapToResponse)
                                 .toList();
@@ -150,11 +153,10 @@ public class OrderService {
         public OrderResponse get(
                         String email,
                         Long id) {
+
                 DeliveryOrder order = findOrder(id);
 
-                verifyOrderAccess(
-                                email,
-                                order);
+                verifyOrderAccess(email, order);
 
                 return mapToResponse(order);
         }
@@ -163,8 +165,14 @@ public class OrderService {
                         String email,
                         Long id,
                         StatusUpdateRequest request) {
+
                 DeliveryOrder order = findOrder(id);
                 User actor = findUser(email);
+
+                if (actor.getRole() == Role.CUSTOMER) {
+                        throw new AccessDeniedException(
+                                        "Customers cannot update order status");
+                }
 
                 if (actor.getRole() == Role.DELIVERY_AGENT) {
 
@@ -182,6 +190,7 @@ public class OrderService {
                 if (!isAllowedTransition(
                                 order.getStatus(),
                                 request.status())) {
+
                         throw new IllegalArgumentException(
                                         "Invalid status transition");
                 }
@@ -212,6 +221,8 @@ public class OrderService {
 
                 addTrackingHistory(order, actor);
 
+                sendStatusNotification(order);
+
                 return mapToResponse(order);
         }
 
@@ -219,6 +230,7 @@ public class OrderService {
                         Long id,
                         Long agentId,
                         String email) {
+
                 DeliveryOrder order = findOrder(id);
 
                 User agent = users
@@ -231,6 +243,11 @@ public class OrderService {
                                         "User is not a delivery agent");
                 }
 
+                if (!agent.isAvailable()) {
+                        throw new IllegalArgumentException(
+                                        "Delivery agent is not available");
+                }
+
                 order.setDeliveryAgent(agent);
 
                 addTrackingHistory(
@@ -240,34 +257,129 @@ public class OrderService {
                 return mapToResponse(order);
         }
 
-        public List<OrderTrackingHistory> getTrackingHistory(
+        public List<TrackingHistoryResponse> getTrackingHistory(
                         String email,
                         Long id) {
+
                 DeliveryOrder order = findOrder(id);
 
-                verifyOrderAccess(
-                                email,
-                                order);
+                verifyOrderAccess(email, order);
 
                 return tracking
-                                .findByOrderIdOrderByCreatedAtAsc(id);
+                                .findByOrderIdOrderByCreatedAtAsc(id)
+                                .stream()
+                                .map(history -> new TrackingHistoryResponse(
+                                                history.getId(),
+                                                history.getOrder().getId(),
+                                                history.getStatus(),
+                                                history.getActor() == null
+                                                                ? null
+                                                                : history.getActor().getId(),
+                                                history.getActor() == null
+                                                                ? null
+                                                                : history.getActor().getName(),
+                                                history.getCreatedAt()))
+                                .toList();
         }
 
-        public List<DeliveryAttempt> getDeliveryAttempts(
+        public List<DeliveryAttemptResponse> getDeliveryAttempts(
                         String email,
                         Long id) {
+
                 DeliveryOrder order = findOrder(id);
 
-                verifyOrderAccess(
-                                email,
-                                order);
+                verifyOrderAccess(email, order);
 
                 return attempts
-                                .findByOrderIdOrderByAttemptedAtDesc(id);
+                                .findByOrderIdOrderByAttemptedAtDesc(id)
+                                .stream()
+                                .map(this::mapToDeliveryAttemptResponse)
+                                .toList();
+        }
+
+        private void sendStatusNotification(
+                        DeliveryOrder order) {
+
+                User customer = order.getCustomer();
+
+                if (customer == null
+                                || customer.getEmail() == null
+                                || customer.getEmail().isBlank()) {
+                        return;
+                }
+
+                OrderStatus status = order.getStatus();
+
+                String subject = "Order #" + order.getId()
+                                + " status update: "
+                                + status;
+
+                String message = buildStatusMessage(
+                                order.getId(),
+                                status);
+
+                emailService.sendEmail(
+                                customer.getEmail(),
+                                subject,
+                                message);
+        }
+
+        private String buildStatusMessage(
+                        Long orderId,
+                        OrderStatus status) {
+
+                return switch (status) {
+
+                        case PICKED_UP ->
+                                "Your order #" + orderId
+                                                + " has been picked up.";
+
+                        case IN_TRANSIT ->
+                                "Your order #" + orderId
+                                                + " is now in transit.";
+
+                        case OUT_FOR_DELIVERY ->
+                                "Your order #" + orderId
+                                                + " is out for delivery.";
+
+                        case DELIVERED ->
+                                "Your order #" + orderId
+                                                + " has been delivered.";
+
+                        case FAILED ->
+                                "Delivery of your order #" + orderId
+                                                + " was unsuccessful.";
+
+                        case RESCHEDULED ->
+                                "Your order #" + orderId
+                                                + " has been rescheduled for another delivery attempt.";
+
+                        default ->
+                                "The status of your order #" + orderId
+                                                + " has been updated to "
+                                                + status + ".";
+                };
+        }
+
+        private DeliveryAttemptResponse mapToDeliveryAttemptResponse(
+                        DeliveryAttempt attempt) {
+
+                User agent = attempt.getDeliveryAgent();
+
+                return new DeliveryAttemptResponse(
+                                attempt.getId(),
+                                attempt.getOrder().getId(),
+                                agent == null ? null : agent.getId(),
+                                agent == null ? null : agent.getName(),
+                                attempt.getAttemptNumber(),
+                                attempt.getStatus(),
+                                attempt.getFailureReason(),
+                                attempt.getAttemptedAt());
         }
 
         private BigDecimal calculateVolumetricWeight(
                         CreateOrderRequest request) {
+
                 return request.lengthCm()
                                 .multiply(request.widthCm())
                                 .multiply(request.heightCm())
@@ -280,6 +392,7 @@ public class OrderService {
         private BigDecimal calculateBaseCharge(
                         BigDecimal chargeableWeight,
                         RateCard rateCard) {
+
                 return chargeableWeight
                                 .multiply(rateCard.getRatePerKg())
                                 .max(rateCard.getMinimumCharge())
@@ -290,6 +403,7 @@ public class OrderService {
 
         private BigDecimal calculateCodSurcharge(
                         CreateOrderRequest request) {
+
                 if (request.paymentType() != PaymentType.COD) {
                         return BigDecimal.ZERO;
                 }
@@ -303,6 +417,7 @@ public class OrderService {
         private boolean isAllowedTransition(
                         OrderStatus currentStatus,
                         OrderStatus newStatus) {
+
                 return switch (currentStatus) {
 
                         case PLACED, RESCHEDULED ->
@@ -321,13 +436,15 @@ public class OrderService {
                         case FAILED ->
                                 newStatus == OrderStatus.RESCHEDULED;
 
-                        default -> false;
+                        default ->
+                                false;
                 };
         }
 
         private void addTrackingHistory(
                         DeliveryOrder order,
                         User actor) {
+
                 OrderTrackingHistory history = new OrderTrackingHistory();
 
                 history.setOrder(order);
@@ -340,6 +457,7 @@ public class OrderService {
         private void verifyOrderAccess(
                         String email,
                         DeliveryOrder order) {
+
                 User user = findUser(email);
 
                 boolean isAdmin = user.getRole() == Role.ADMIN;
@@ -364,7 +482,7 @@ public class OrderService {
 
         private User findUser(String email) {
                 return users
-                                .findByEmailIgnoreCase(email)
+                                .findByEmailIgnoreCase(email.trim())
                                 .orElseThrow(() -> new IllegalArgumentException(
                                                 "User not found"));
         }
@@ -385,6 +503,7 @@ public class OrderService {
 
         private OrderResponse mapToResponse(
                         DeliveryOrder order) {
+
                 return new OrderResponse(
                                 order.getId(),
                                 order.getCustomer().getId(),

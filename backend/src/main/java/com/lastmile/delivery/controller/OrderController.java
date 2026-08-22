@@ -16,9 +16,9 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.lastmile.delivery.dto.request.CreateOrderRequest;
 import com.lastmile.delivery.dto.request.StatusUpdateRequest;
+import com.lastmile.delivery.dto.response.DeliveryAttemptResponse;
 import com.lastmile.delivery.dto.response.OrderResponse;
-import com.lastmile.delivery.entity.DeliveryAttempt;
-import com.lastmile.delivery.entity.OrderTrackingHistory;
+import com.lastmile.delivery.dto.response.TrackingHistoryResponse;
 import com.lastmile.delivery.service.OrderService;
 
 import jakarta.validation.Valid;
@@ -38,6 +38,7 @@ public class OrderController {
         public ResponseEntity<OrderResponse> createOrder(
                         Authentication authentication,
                         @Valid @RequestBody CreateOrderRequest request) {
+
                 OrderResponse response = orderService.create(
                                 authentication.getName(),
                                 request);
@@ -50,6 +51,7 @@ public class OrderController {
         @GetMapping
         public List<OrderResponse> getMyOrders(
                         Authentication authentication) {
+
                 return orderService.mine(authentication.getName());
         }
 
@@ -57,6 +59,7 @@ public class OrderController {
         public OrderResponse getOrder(
                         Authentication authentication,
                         @PathVariable Long id) {
+
                 return orderService.get(
                                 authentication.getName(),
                                 id);
@@ -68,6 +71,7 @@ public class OrderController {
                         Authentication authentication,
                         @PathVariable Long id,
                         @Valid @RequestBody StatusUpdateRequest request) {
+
                 return orderService.transition(
                                 authentication.getName(),
                                 id,
@@ -80,6 +84,7 @@ public class OrderController {
                         Authentication authentication,
                         @PathVariable Long id,
                         @PathVariable Long agentId) {
+
                 return orderService.assign(
                                 id,
                                 agentId,
@@ -87,18 +92,20 @@ public class OrderController {
         }
 
         @GetMapping("/{id}/tracking")
-        public List<OrderTrackingHistory> getTrackingHistory(
+        public List<TrackingHistoryResponse> getTrackingHistory(
                         Authentication authentication,
                         @PathVariable Long id) {
+
                 return orderService.getTrackingHistory(
                                 authentication.getName(),
                                 id);
         }
 
         @GetMapping("/{id}/attempts")
-        public List<DeliveryAttempt> getDeliveryAttempts(
+        public List<DeliveryAttemptResponse> getDeliveryAttempts(
                         Authentication authentication,
                         @PathVariable Long id) {
+
                 return orderService.getDeliveryAttempts(
                                 authentication.getName(),
                                 id);
