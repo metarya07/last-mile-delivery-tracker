@@ -6,7 +6,7 @@ A full-stack, enterprise-grade logistics and delivery management platform. Built
 
 ## 🌐 Hosted Deployment
 
-- **Frontend Application (Vercel)**: [https://last-mile-delivery-frontend.vercel.app](https://last-mile-delivery-frontend.vercel.app)
+- **Frontend Application (Vercel)**: [https://frontend-beige-chi-18.vercel.app](https://frontend-beige-chi-18.vercel.app)
 - **Repository**: [https://github.com/metarya07/last-mile-delivery-tracker](https://github.com/metarya07/last-mile-delivery-tracker)
 
 ---
