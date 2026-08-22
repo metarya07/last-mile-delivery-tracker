@@ -35,7 +35,7 @@ export function AvailabilityToggle({ initialAvailable = true, onToggle }) {
         onClick={handleToggle}
         disabled={busy}
       >
-        {busy ? 'Updatingâ€¦' : available ? 'Go Offline' : 'Go Online'}
+        {busy ? 'Updating...' : available ? 'Go Offline' : 'Go Online'}
       </button>
       {error && <span className="toggle-error">{error}</span>}
     </div>

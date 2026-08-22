@@ -4,6 +4,7 @@ import { Modal } from '../common/Modal'
 import { StatusBadge } from '../common/StatusBadge'
 import { TrackingTimeline } from './TrackingTimeline'
 import { DeliveryAttemptsList } from './DeliveryAttemptsList'
+import { formatCurrency, formatDate } from '../../utils/formatters'
 
 export function OrderDetailModal({ isOpen, onClose, orderId }) {
   const [order, setOrder] = useState(null)
@@ -64,11 +65,11 @@ export function OrderDetailModal({ isOpen, onClose, orderId }) {
       isOpen={isOpen}
       onClose={handleClose}
       title={order ? `Order #${order.id}` : 'Order Details'}
-      subtitle={order ? `${order.orderType} Â· ${order.paymentType}` : 'Delivery Tracker'}
+      subtitle={order ? `${order.orderType} - ${order.paymentType}` : 'Delivery Tracker'}
       maxWidth="680px"
     >
       {loading ? (
-        <div className="modal-loading">Loading order detailsâ€¦</div>
+        <div className="modal-loading">Loading order details...</div>
       ) : error ? (
         <div className="alert alert-error">{error}</div>
       ) : order ? (
@@ -83,7 +84,7 @@ export function OrderDetailModal({ isOpen, onClose, orderId }) {
             </div>
             <div className="summary-charge">
               <span className="label">Final Charge</span>
-              <strong>â‚¹{order.finalCharge != null ? Number(order.finalCharge).toFixed(2) : '0.00'}</strong>
+              <strong>{formatCurrency(order.finalCharge)}</strong>
             </div>
           </div>
 
@@ -118,14 +119,18 @@ export function OrderDetailModal({ isOpen, onClose, orderId }) {
                   <div className="route-stop">
                     <span className="route-dot pickup-dot" />
                     <div>
-                      <small>Pickup Zone: <strong>{order.pickupZone || 'N/A'}</strong></small>
+                      <small>
+                        Pickup Zone: <strong>{order.pickupZone || 'N/A'}</strong>
+                      </small>
                       <p>{order.pickupAddress}</p>
                     </div>
                   </div>
                   <div className="route-stop">
                     <span className="route-dot drop-dot" />
                     <div>
-                      <small>Drop Zone: <strong>{order.dropZone || 'N/A'}</strong></small>
+                      <small>
+                        Drop Zone: <strong>{order.dropZone || 'N/A'}</strong>
+                      </small>
                       <p>{order.dropAddress}</p>
                     </div>
                   </div>
@@ -149,7 +154,7 @@ export function OrderDetailModal({ isOpen, onClose, orderId }) {
                   </div>
                   <div className="spec-row">
                     <span>Created Date:</span>
-                    <span>{new Date(order.createdAt).toLocaleString()}</span>
+                    <span>{formatDate(order.createdAt)}</span>
                   </div>
                   <div className="spec-row">
                     <span>Assigned Agent:</span>
@@ -161,14 +166,10 @@ export function OrderDetailModal({ isOpen, onClose, orderId }) {
           )}
 
           {/* Tab 2: Tracking */}
-          {activeTab === 'tracking' && (
-            <TrackingTimeline history={tracking} />
-          )}
+          {activeTab === 'tracking' && <TrackingTimeline history={tracking} />}
 
           {/* Tab 3: Attempts */}
-          {activeTab === 'attempts' && (
-            <DeliveryAttemptsList attempts={attempts} />
-          )}
+          {activeTab === 'attempts' && <DeliveryAttemptsList attempts={attempts} />}
         </div>
       ) : null}
     </Modal>

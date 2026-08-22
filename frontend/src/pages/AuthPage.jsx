@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../context/useAuth'
 import { ForgotPasswordModal } from '../components/auth/ForgotPasswordModal'
+import { IconTruck } from '../components/common/Icons'
 
 export function AuthPage() {
   const { login, register } = useAuth()
@@ -49,7 +50,7 @@ export function AuthPage() {
         password: regPassword,
         phone: regPhone.trim() || undefined,
       })
-      setSuccess('Account created successfully! Welcome.')
+      setSuccess('Account created successfully! Welcome aboard.')
     } catch (err) {
       setError(err.message || 'Registration failed.')
     } finally {
@@ -58,123 +59,159 @@ export function AuthPage() {
   }
 
   return (
-    <main className="login">
-      <section>
-        <p className="eyebrow">LAST MILE DELIVERY TRACKER</p>
-        <h1>Every delivery, visible.</h1>
-        <p className="intro">A focused operations desk for customers, agents, and administrators.</p>
-
-        <div className="auth-card">
-          <div className="auth-tabs" role="tablist">
-            <button
-              type="button"
-              className={`auth-tab ${tab === 'login' ? 'active' : ''}`}
-              onClick={() => { setTab('login'); setError(''); setSuccess('') }}
-            >
-              Sign In
-            </button>
-            <button
-              type="button"
-              className={`auth-tab ${tab === 'register' ? 'active' : ''}`}
-              onClick={() => { setTab('register'); setError(''); setSuccess('') }}
-            >
-              Register Customer
-            </button>
+    <main className="login-page-container">
+      <div className="login-card">
+        {/* Brand Header */}
+        <div className="login-header">
+          <div className="login-brand-icon">
+            <IconTruck size={32} />
           </div>
-
-          {error && <div className="alert alert-error">{error}</div>}
-          {success && <div className="alert alert-success">{success}</div>}
-
-          {tab === 'login' ? (
-            <form onSubmit={handleLogin}>
-              <label>
-                Email
-                <input
-                  type="email"
-                  value={loginEmail}
-                  onChange={(e) => setLoginEmail(e.target.value)}
-                  placeholder="name@example.com"
-                  required
-                />
-              </label>
-              <label>
-                Password
-                <input
-                  type="password"
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  required
-                />
-              </label>
-
-              <div className="form-secondary-actions">
-                <button
-                  type="button"
-                  className="btn-link"
-                  onClick={() => setShowForgotModal(true)}
-                >
-                  Forgot password?
-                </button>
-              </div>
-
-              <button type="submit" className="btn-primary" disabled={busy}>
-                {busy ? 'Signing inâ€¦' : 'Sign in'}
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleRegister}>
-              <label>
-                Full Name
-                <input
-                  type="text"
-                  value={regName}
-                  onChange={(e) => setRegName(e.target.value)}
-                  placeholder="Jane Doe"
-                  maxLength={100}
-                  required
-                />
-              </label>
-              <label>
-                Email
-                <input
-                  type="email"
-                  value={regEmail}
-                  onChange={(e) => setRegEmail(e.target.value)}
-                  placeholder="name@example.com"
-                  required
-                />
-              </label>
-              <label>
-                Password (min 8 characters)
-                <input
-                  type="password"
-                  value={regPassword}
-                  onChange={(e) => setRegPassword(e.target.value)}
-                  placeholder="At least 8 characters"
-                  minLength={8}
-                  maxLength={72}
-                  required
-                />
-              </label>
-              <label>
-                Phone Number (optional)
-                <input
-                  type="tel"
-                  value={regPhone}
-                  onChange={(e) => setRegPhone(e.target.value)}
-                  placeholder="+91 98765 43210"
-                  maxLength={20}
-                />
-              </label>
-
-              <button type="submit" className="btn-primary" disabled={busy}>
-                {busy ? 'Creating accountâ€¦' : 'Create Account'}
-              </button>
-            </form>
-          )}
+          <p className="eyebrow" style={{ marginTop: '12px' }}>LAST MILE DELIVERY TRACKER</p>
+          <h1 style={{ fontSize: '1.6rem', fontWeight: 800, marginTop: '4px', color: 'var(--text-main)' }}>
+            Every delivery, visible.
+          </h1>
+          <p style={{ color: 'var(--text-muted)', fontSize: '13.5px', marginTop: '6px' }}>
+            A focused operations desk for customers, agents, and administrators.
+          </p>
         </div>
-      </section>
+
+        {/* Tabs */}
+        <div className="login-tabs">
+          <button
+            type="button"
+            className={`login-tab ${tab === 'login' ? 'active' : ''}`}
+            onClick={() => { setTab('login'); setError(''); setSuccess('') }}
+          >
+            Sign In
+          </button>
+          <button
+            type="button"
+            className={`login-tab ${tab === 'register' ? 'active' : ''}`}
+            onClick={() => { setTab('register'); setError(''); setSuccess('') }}
+          >
+            Create Account
+          </button>
+        </div>
+
+        {/* Alerts */}
+        {error && (
+          <div className="alert alert-error" style={{ marginBottom: '14px' }}>
+            {error}
+          </div>
+        )}
+        {success && (
+          <div className="alert alert-success" style={{ marginBottom: '14px' }}>
+            {success}
+          </div>
+        )}
+
+        {/* Sign In Form */}
+        {tab === 'login' ? (
+          <form onSubmit={handleLogin} className="modal-form">
+            <label>
+              Email Address
+              <input
+                type="email"
+                value={loginEmail}
+                onChange={(e) => setLoginEmail(e.target.value)}
+                placeholder="name@example.com"
+                required
+                autoFocus
+              />
+            </label>
+            <label>
+              Password
+              <input
+                type="password"
+                value={loginPassword}
+                onChange={(e) => setLoginPassword(e.target.value)}
+                placeholder="Enter your password"
+                required
+              />
+            </label>
+
+            <div style={{ textAlign: 'right', marginTop: '-6px' }}>
+              <button
+                type="button"
+                className="btn-link"
+                onClick={() => setShowForgotModal(true)}
+                style={{ fontSize: '13px' }}
+              >
+                Forgot password?
+              </button>
+            </div>
+
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={busy}
+              style={{ width: '100%', height: '44px', fontSize: '14px' }}
+            >
+              {busy ? 'Signing in...' : 'Sign in'}
+            </button>
+          </form>
+        ) : (
+          <form onSubmit={handleRegister} className="modal-form">
+            <label>
+              Full Name
+              <input
+                type="text"
+                value={regName}
+                onChange={(e) => setRegName(e.target.value)}
+                placeholder="Jane Doe"
+                maxLength={100}
+                required
+                autoFocus
+              />
+            </label>
+            <label>
+              Email Address
+              <input
+                type="email"
+                value={regEmail}
+                onChange={(e) => setRegEmail(e.target.value)}
+                placeholder="name@example.com"
+                required
+              />
+            </label>
+            <label>
+              Password
+              <input
+                type="password"
+                value={regPassword}
+                onChange={(e) => setRegPassword(e.target.value)}
+                placeholder="At least 8 characters"
+                minLength={8}
+                maxLength={72}
+                required
+              />
+            </label>
+            <label>
+              Phone Number <span style={{ fontWeight: 400, color: 'var(--text-muted)' }}>(optional)</span>
+              <input
+                type="tel"
+                value={regPhone}
+                onChange={(e) => setRegPhone(e.target.value)}
+                placeholder="+91 98765 43210"
+                maxLength={20}
+              />
+            </label>
+
+            <button
+              type="submit"
+              className="btn-primary"
+              disabled={busy}
+              style={{ width: '100%', height: '44px', fontSize: '14px' }}
+            >
+              {busy ? 'Creating account...' : 'Create Account'}
+            </button>
+          </form>
+        )}
+
+        <p style={{ textAlign: 'center', marginTop: '20px', fontSize: '12px', color: 'var(--text-faint)' }}>
+          Customer self-registration only. Delivery agents & admins are provisioned by system administrators.
+        </p>
+      </div>
 
       <ForgotPasswordModal
         isOpen={showForgotModal}

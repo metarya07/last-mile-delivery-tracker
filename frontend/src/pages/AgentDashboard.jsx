@@ -88,12 +88,12 @@ export function AgentDashboard() {
             <h2>Assigned Orders</h2>
           </div>
           <button type="button" className="btn-secondary" onClick={handleRefresh} disabled={loading}>
-            {loading ? 'Refreshingâ€¦' : 'Refresh'}
+            {loading ? 'Refreshing...' : 'Refresh'}
           </button>
         </div>
 
         {loading ? (
-          <p className="loading-state">Loading your assigned runsâ€¦</p>
+          <p className="loading-state">Loading your assigned runs...</p>
         ) : orders.length === 0 ? (
           <div className="empty-state">
             <p>No orders currently assigned to you.</p>

@@ -3,11 +3,11 @@ import { orderApi } from '../../api/orderApi'
 import { Modal } from '../common/Modal'
 
 const DEFAULT_ZONES = [
-  { id: 1, name: 'Zone 1 â€” North Zone' },
-  { id: 2, name: 'Zone 2 â€” South Zone' },
-  { id: 3, name: 'Zone 3 â€” East Zone' },
-  { id: 4, name: 'Zone 4 â€” West Zone' },
-  { id: 5, name: 'Zone 5 â€” Central Zone' },
+  { id: 1, name: 'Zone 1 - North Zone' },
+  { id: 2, name: 'Zone 2 - South Zone' },
+  { id: 3, name: 'Zone 3 - East Zone' },
+  { id: 4, name: 'Zone 4 - West Zone' },
+  { id: 5, name: 'Zone 5 - Central Zone' },
 ]
 
 export function CreateOrderModal({ isOpen, onClose, onOrderCreated }) {
@@ -68,7 +68,7 @@ export function CreateOrderModal({ isOpen, onClose, onOrderCreated }) {
       setDropAddress('')
       onClose()
     } catch (err) {
-      setError(err.message || 'Failed to create order. Please check zone rates and inputs.')
+      setError(err.message || 'Failed to place delivery order.')
     } finally {
       setBusy(false)
     }
@@ -79,30 +79,30 @@ export function CreateOrderModal({ isOpen, onClose, onOrderCreated }) {
       isOpen={isOpen}
       onClose={onClose}
       title="Create New Delivery Order"
-      subtitle="Customer Dispatch Desk"
+      subtitle="Customer Booking Desk"
       maxWidth="620px"
     >
       {error && <div className="alert alert-error">{error}</div>}
 
       <form onSubmit={handleSubmit} className="modal-form">
-        <div className="form-row">
+        <div className="form-grid-2">
           <label>
             Pickup Address
             <textarea
               rows={2}
               value={pickupAddress}
               onChange={(e) => setPickupAddress(e.target.value)}
-              placeholder="e.g. 101 Innovation Park, Warehouse #4"
+              placeholder="Full pickup address, landmark, PIN"
               required
             />
           </label>
           <label>
-            Drop Address
+            Delivery Address
             <textarea
               rows={2}
               value={dropAddress}
               onChange={(e) => setDropAddress(e.target.value)}
-              placeholder="e.g. Flat 304, Green Horizon Towers"
+              placeholder="Destination address, recipient contact, PIN"
               required
             />
           </label>
@@ -113,7 +113,7 @@ export function CreateOrderModal({ isOpen, onClose, onOrderCreated }) {
             Pickup Zone
             <select
               value={pickupZoneId}
-              onChange={(e) => setPickupZoneId(Number(e.target.value))}
+              onChange={(e) => setPickupZoneId(e.target.value)}
               required
             >
               {DEFAULT_ZONES.map((z) => (
@@ -127,7 +127,7 @@ export function CreateOrderModal({ isOpen, onClose, onOrderCreated }) {
             Drop Zone
             <select
               value={dropZoneId}
-              onChange={(e) => setDropZoneId(Number(e.target.value))}
+              onChange={(e) => setDropZoneId(e.target.value)}
               required
             >
               {DEFAULT_ZONES.map((z) => (
@@ -139,9 +139,9 @@ export function CreateOrderModal({ isOpen, onClose, onOrderCreated }) {
           </label>
         </div>
 
-        <div className="parcel-specs-box">
-          <p className="box-title">Parcel Dimensions & Weight</p>
-          <div className="form-grid-4">
+        <div className="form-section">
+          <p className="section-label">Package Dimensions & Weight</p>
+          <div className="dimensions-grid">
             <label>
               Length (cm)
               <input
@@ -188,8 +188,12 @@ export function CreateOrderModal({ isOpen, onClose, onOrderCreated }) {
             </label>
           </div>
           <div className="weight-estimation">
-            <span>Volumetric Weight: <strong>{estimatedVolumetricWeight} kg</strong></span>
-            <span>Chargeable Weight: <strong>{estimatedChargeableWeight} kg</strong></span>
+            <span>
+              Volumetric Weight: <strong>{estimatedVolumetricWeight} kg</strong>
+            </span>
+            <span>
+              Chargeable Weight: <strong>{estimatedChargeableWeight} kg</strong>
+            </span>
           </div>
         </div>
 
@@ -215,7 +219,7 @@ export function CreateOrderModal({ isOpen, onClose, onOrderCreated }) {
             Cancel
           </button>
           <button type="submit" disabled={busy} className="btn-primary">
-            {busy ? 'Placing Orderâ€¦' : 'Place Delivery Order'}
+            {busy ? 'Placing Order...' : 'Place Delivery Order'}
           </button>
         </div>
       </form>

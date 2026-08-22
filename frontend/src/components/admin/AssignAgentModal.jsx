@@ -69,7 +69,7 @@ export function AssignAgentModal({ isOpen, onClose, order, onAssigned }) {
       {error && <div className="alert alert-error">{error}</div>}
 
       {loading ? (
-        <div className="modal-loading">Checking available delivery agentsâ€¦</div>
+        <div className="modal-loading">Checking available delivery agents...</div>
       ) : agents.length === 0 ? (
         <div className="empty-state-notice">
           <p>No delivery agents are currently marked as available/online.</p>
@@ -88,7 +88,7 @@ export function AssignAgentModal({ isOpen, onClose, order, onAssigned }) {
             >
               {agents.map((ag) => (
                 <option key={ag.id} value={ag.id}>
-                  {ag.name} ({ag.email}) {ag.phone ? `Â· ${ag.phone}` : ''}
+                  {ag.name} ({ag.email}) {ag.phone ? `- ${ag.phone}` : ''}
                 </option>
               ))}
             </select>
@@ -99,7 +99,7 @@ export function AssignAgentModal({ isOpen, onClose, order, onAssigned }) {
               Cancel
             </button>
             <button type="submit" disabled={busy} className="btn-primary">
-              {busy ? 'Assigningâ€¦' : 'Confirm Assignment'}
+              {busy ? 'Assigning...' : 'Confirm Assignment'}
             </button>
           </div>
         </form>

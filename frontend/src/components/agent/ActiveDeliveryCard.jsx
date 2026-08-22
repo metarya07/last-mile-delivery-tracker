@@ -1,4 +1,6 @@
 import { StatusBadge } from '../common/StatusBadge'
+import { formatCurrency } from '../../utils/formatters'
+import { IconArrowRight } from '../common/Icons'
 
 export function ActiveDeliveryCard({ order, onUpdateStatus, onViewDetails }) {
   if (!order) {
@@ -47,7 +49,7 @@ export function ActiveDeliveryCard({ order, onUpdateStatus, onViewDetails }) {
           <div className="meta-pill">
             <span>Payment:</span> <strong>{order.paymentType}</strong>
             {order.paymentType === 'COD' && (
-              <span className="cod-alert">Collect â‚¹{order.finalCharge != null ? Number(order.finalCharge).toFixed(2) : '0.00'}</span>
+              <span className="cod-alert">Collect {formatCurrency(order.finalCharge)}</span>
             )}
           </div>
           <div className="meta-pill">
@@ -65,8 +67,10 @@ export function ActiveDeliveryCard({ order, onUpdateStatus, onViewDetails }) {
           className="btn-primary"
           onClick={() => onUpdateStatus(order)}
           disabled={order.status === 'DELIVERED'}
+          style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
         >
-          âš¡ Advance / Update Status
+          <span>Advance / Update Status</span>
+          <IconArrowRight size={16} />
         </button>
         <button
           type="button"

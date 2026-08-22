@@ -14,10 +14,26 @@ import { DeliveryAttemptsList } from '../components/tracking/DeliveryAttemptsLis
 import { ForgotPasswordModal } from '../components/auth/ForgotPasswordModal'
 import { Modal } from '../components/common/Modal'
 import { deliveryPartnerApplicationApi } from '../api/deliveryPartnerApplicationApi'
+import {
+  IconTruck,
+  IconPackage,
+  IconClock,
+  IconUser,
+  IconRefresh,
+  IconMenu,
+  IconSearch,
+  IconAlert,
+  IconCheck,
+  IconX,
+  IconPartner,
+  IconPhone,
+} from '../components/common/Icons'
+import { formatCurrency, formatDate, formatShortDate } from '../utils/formatters'
 
 export function AdminPortal() {
   const { user, logout } = useAuth()
-  const [currentTab, setCurrentTab] = useState('dashboard') // 'dashboard' | 'orders' | 'agents' | 'assignments' | 'applications' | 'tracking'
+  const [currentTab, setCurrentTab] = useState('dashboard') // 'dashboard' | 'orders' | 'assignments' | 'agents' | 'applications' | 'tracking'
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   const [orders, setOrders] = useState([])
   const [agents, setAgents] = useState([])
@@ -105,7 +121,7 @@ export function AdminPortal() {
   }
 
   const handleApproveApplication = async (appId) => {
-    if (!window.confirm(`Approve this application and promote the applicant to DELIVERY_AGENT?`)) {
+    if (!window.confirm('Approve this application and promote the applicant to DELIVERY_AGENT?')) {
       return
     }
     setApproveBusyId(appId)
@@ -115,7 +131,6 @@ export function AdminPortal() {
       const updatedApp = await deliveryPartnerApplicationApi.approveApplication(appId)
       setApplications((prev) => prev.map((a) => (a.id === appId ? updatedApp : a)))
       setAppActionSuccess(`Application #${appId} approved! User ${updatedApp.applicantName} is now a DELIVERY_AGENT.`)
-      // Refresh fleet and orders data
       setRefreshIndex((prev) => prev + 1)
     } catch (err) {
       setAppActionError(err.message || 'Failed to approve application.')
@@ -221,7 +236,7 @@ export function AdminPortal() {
       setTrackingSelectedOrder(null)
       setTrackingHistoryList([])
       setTrackingAttemptsList([])
-      setTrackingError(err.message || `No tracking history found for Order #${id}.`)
+      setTrackingError(err.message || `Unable to find tracking records for Order #${id}.`)
     } finally {
       setTrackingLoading(false)
     }
@@ -240,13 +255,56 @@ export function AdminPortal() {
     }
   }
 
+  const switchTab = (tab) => {
+    setCurrentTab(tab)
+    setMobileNavOpen(false)
+  }
+
   return (
     <div className="shell admin-shell">
+      {/* Mobile Topbar */}
+      <header className="mobile-topbar">
+        <button
+          type="button"
+          className="mobile-menu-btn"
+          onClick={() => setMobileNavOpen((prev) => !prev)}
+          aria-label="Toggle navigation"
+        >
+          <IconMenu size={22} />
+        </button>
+        <div className="mobile-topbar-brand">
+          <IconTruck size={20} className="brand-icon" />
+          <span>Control Center</span>
+        </div>
+        <button
+          type="button"
+          className="mobile-user-btn"
+          onClick={() => setShowForgotModal(true)}
+          aria-label="Security"
+        >
+          <IconUser size={18} />
+        </button>
+      </header>
+
+      {/* Backdrop for mobile drawer */}
+      {mobileNavOpen && (
+        <div
+          className="sidebar-backdrop"
+          onClick={() => setMobileNavOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Admin Sidebar Navigation */}
-      <aside className="portal-sidebar admin-sidebar">
+      <aside className={`portal-sidebar admin-sidebar ${mobileNavOpen ? 'open' : ''}`}>
         <div className="aside-brand">
-          <p className="eyebrow">ADMINISTRATION</p>
-          <h2>Control Center</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <IconTruck size={22} className="brand-icon" />
+            <div>
+              <p className="eyebrow">ADMINISTRATION</p>
+              <h2>Control Center</h2>
+            </div>
+          </div>
         </div>
 
         <nav>
@@ -255,48 +313,54 @@ export function AdminPortal() {
             <button
               type="button"
               className={`nav-link-btn ${currentTab === 'dashboard' ? 'active' : ''}`}
-              onClick={() => setCurrentTab('dashboard')}
+              onClick={() => switchTab('dashboard')}
             >
-              Dashboard
+              <IconTruck size={16} />
+              <span>Dashboard</span>
             </button>
             <button
               type="button"
               className={`nav-link-btn ${currentTab === 'orders' ? 'active' : ''}`}
-              onClick={() => setCurrentTab('orders')}
+              onClick={() => switchTab('orders')}
             >
-              All Orders ({orders.length})
+              <IconPackage size={16} />
+              <span>All Orders ({orders.length})</span>
             </button>
             <button
               type="button"
               className={`nav-link-btn ${currentTab === 'assignments' ? 'active' : ''}`}
-              onClick={() => setCurrentTab('assignments')}
+              onClick={() => switchTab('assignments')}
             >
-              Assignments Queue {unassignedOrders.length > 0 ? `(${unassignedOrders.length})` : ''}
+              <IconClock size={16} />
+              <span>Assignments Queue {unassignedOrders.length > 0 ? `(${unassignedOrders.length})` : ''}</span>
             </button>
             <button
               type="button"
               className={`nav-link-btn ${currentTab === 'agents' ? 'active' : ''}`}
-              onClick={() => setCurrentTab('agents')}
+              onClick={() => switchTab('agents')}
             >
-              Delivery Agents ({agents.length})
+              <IconUser size={16} />
+              <span>Delivery Agents ({agents.length})</span>
             </button>
             <button
               type="button"
               className={`nav-link-btn ${currentTab === 'applications' ? 'active' : ''}`}
               onClick={() => {
-                setCurrentTab('applications')
+                switchTab('applications')
                 setAppActionError('')
                 setAppActionSuccess('')
               }}
             >
-              Partner Applications {pendingApplications.length > 0 ? `(${pendingApplications.length} pending)` : `(${applications.length})`}
+              <IconPartner size={16} />
+              <span>Partner Applications {pendingApplications.length > 0 ? `(${pendingApplications.length} pending)` : `(${applications.length})`}</span>
             </button>
             <button
               type="button"
               className={`nav-link-btn ${currentTab === 'tracking' ? 'active' : ''}`}
-              onClick={() => setCurrentTab('tracking')}
+              onClick={() => switchTab('tracking')}
             >
-              Tracking & Audit
+              <IconSearch size={16} />
+              <span>Tracking & Audit</span>
             </button>
           </div>
         </nav>
@@ -334,70 +398,97 @@ export function AdminPortal() {
           </div>
         </header>
 
-        {error && <div className="alert alert-error">{error}</div>}
+        {error && (
+          <div className="alert alert-error">
+            <IconAlert size={18} />
+            <span>{error}</span>
+          </div>
+        )}
 
         {/* TAB 1: ADMIN DASHBOARD */}
         {currentTab === 'dashboard' && (
           <div className="dashboard-content">
             <div className="section-toolbar">
               <div>
-                <h2>Global System Metrics</h2>
-                <p className="subtitle">Platform-wide overview of order volume, statuses, and fleet health.</p>
+                <h2>Platform Metrics Overview</h2>
+                <p className="subtitle">System-wide parcel throughput, active fleet status, and fulfillment counters.</p>
               </div>
-              <button type="button" className="btn-secondary" onClick={handleRefresh} disabled={loading}>
-                {loading ? 'Refreshingâ€¦' : 'Refresh System Data'}
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={handleRefresh}
+                disabled={loading}
+              >
+                <IconRefresh size={14} />
+                <span>{loading ? 'Refreshing...' : 'Refresh System Data'}</span>
               </button>
             </div>
 
-            {/* Platform Metrics */}
-            <section className="metrics-grid metrics-admin">
+            {/* Metrics Overview */}
+            <section className="metrics-grid">
               <MetricCard label="Total Orders" value={summary.total ?? orders.length} />
-              <MetricCard label="Placed / New" value={summary.PLACED ?? 0} />
-              <MetricCard label="Picked Up" value={summary.PICKED_UP ?? 0} />
               <MetricCard label="In Transit" value={summary.IN_TRANSIT ?? 0} />
-              <MetricCard label="Out for Delivery" value={summary.OUT_FOR_DELIVERY ?? 0} />
               <MetricCard label="Delivered" value={summary.DELIVERED ?? 0} />
-              <MetricCard label="Failed" value={summary.FAILED ?? 0} />
-              <MetricCard label="Rescheduled" value={summary.RESCHEDULED ?? 0} />
+              <MetricCard label="Needs Attention / Failed" value={summary.FAILED ?? 0} />
             </section>
 
-            {/* Unassigned Attention Alert */}
-            {unassignedOrders.length > 0 && (
-              <div className="alert alert-info dispatch-alert-banner">
-                <div>
-                  <strong>{unassignedOrders.length} unassigned order(s) waiting for driver allocation.</strong>
-                  <p>Assign available delivery agents to keep shipments on schedule.</p>
+            {/* Operations Attention Strip */}
+            <div className="dashboard-quick-actions">
+              {unassignedOrders.length > 0 ? (
+                <div className="panel action-alert-card">
+                  <div>
+                    <span className="live-pulse-badge">PENDING ALLOCATION</span>
+                    <h3>{unassignedOrders.length} Order(s) Awaiting Driver Assignment</h3>
+                    <p>Allocate delivery partners from the queue to start parcel pickups.</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    onClick={() => setCurrentTab('assignments')}
+                  >
+                    Open Assignment Queue
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  className="btn-primary"
-                  onClick={() => setCurrentTab('assignments')}
-                >
-                  Go to Assignments Queue
-                </button>
-              </div>
-            )}
+              ) : (
+                <div className="panel action-ok-card">
+                  <div>
+                    <span className="badge-agent-assigned">ROSTER BALANCED</span>
+                    <h3>All Active Orders Assigned</h3>
+                    <p>All active packages have been assigned to delivery agents.</p>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setAgentListOpen(true)}
+                  >
+                    View Fleet Directory
+                  </button>
+                </div>
+              )}
+            </div>
 
-            {/* Recent Orders Overview */}
-            <section className="panel" style={{ marginTop: '20px' }}>
+            {/* Global Orders Panel */}
+            <section className="panel">
               <div className="heading">
                 <div>
-                  <p className="eyebrow">GLOBAL REGISTRY</p>
-                  <h2>Recent System Shipments</h2>
+                  <p className="eyebrow">RECENT ACTIVITY</p>
+                  <h2>Live Package Registry</h2>
                 </div>
                 <button
                   type="button"
-                  className="btn-link"
+                  className="btn-secondary"
                   onClick={() => setCurrentTab('orders')}
                 >
-                  View All Orders &rarr;
+                  View All Orders ({orders.length})
                 </button>
               </div>
 
               {loading ? (
-                <p className="loading-state">Loading system-wide ordersâ€¦</p>
+                <p className="loading-state">Loading system-wide orders...</p>
               ) : orders.length === 0 ? (
-                <p className="empty-state">No orders registered in the system yet.</p>
+                <div className="empty-state">
+                  <p>No orders registered in the system yet.</p>
+                </div>
               ) : (
                 <div className="orders-table-wrapper">
                   <table className="orders-table">
@@ -405,7 +496,7 @@ export function AdminPortal() {
                       <tr>
                         <th>Order #</th>
                         <th>Customer</th>
-                        <th>Agent</th>
+                        <th>Assigned Agent</th>
                         <th>Route</th>
                         <th>Charge</th>
                         <th>Status</th>
@@ -415,8 +506,12 @@ export function AdminPortal() {
                     <tbody>
                       {orders.slice(0, 6).map((order) => (
                         <tr key={order.id}>
-                          <td><strong>#{order.id}</strong></td>
-                          <td><span>User #{order.customerId}</span></td>
+                          <td>
+                            <strong>#{order.id}</strong>
+                          </td>
+                          <td>
+                            <span>User #{order.customerId}</span>
+                          </td>
                           <td>
                             {order.deliveryAgentId ? (
                               <span className="badge-agent-assigned">Agent #{order.deliveryAgentId}</span>
@@ -427,19 +522,28 @@ export function AdminPortal() {
                           <td>
                             <div className="route-cell">
                               <span className="route-zones">{order.pickupZone} &rarr; {order.dropZone}</span>
+                              <span className="route-address" title={order.dropAddress}>
+                                {order.dropAddress}
+                              </span>
                             </div>
                           </td>
-                          <td><strong>â‚¹{order.finalCharge != null ? Number(order.finalCharge).toFixed(2) : '0.00'}</strong></td>
-                          <td><StatusBadge status={order.status} /></td>
+                          <td>
+                            <strong>{formatCurrency(order.finalCharge)}</strong>
+                          </td>
+                          <td>
+                            <StatusBadge status={order.status} />
+                          </td>
                           <td>
                             <div className="table-actions-group">
-                              <button
-                                type="button"
-                                className="btn-table-primary"
-                                onClick={() => setAssignModalOrder(order)}
-                              >
-                                {order.deliveryAgentId ? 'Reassign' : 'Assign'}
-                              </button>
+                              {!order.deliveryAgentId && (
+                                <button
+                                  type="button"
+                                  className="btn-table-primary"
+                                  onClick={() => setAssignModalOrder(order)}
+                                >
+                                  Assign
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 className="btn-table-action"
@@ -459,24 +563,30 @@ export function AdminPortal() {
           </div>
         )}
 
-        {/* TAB 2: ALL ORDERS */}
+        {/* TAB 2: ALL ORDERS REGISTRY */}
         {currentTab === 'orders' && (
           <div className="dashboard-content">
             <div className="section-toolbar">
               <div>
-                <h2>All System Orders</h2>
-                <p className="subtitle">Search, filter, assign, and inspect any order in the platform.</p>
+                <h2>Central Orders Registry</h2>
+                <p className="subtitle">Search, filter, assign, and manage all platform shipments.</p>
               </div>
-              <button type="button" className="btn-secondary" onClick={handleRefresh} disabled={loading}>
-                {loading ? 'Refreshingâ€¦' : 'Refresh'}
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={handleRefresh}
+                disabled={loading}
+              >
+                <IconRefresh size={14} />
+                <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
               </button>
             </div>
 
-            {/* Filters */}
+            {/* Filter Bar */}
             <div className="filter-bar">
               <input
                 type="text"
-                placeholder="Search by Order #, Customer ID, Agent ID, or Addressâ€¦"
+                placeholder="Search by Order #, Customer ID, Agent ID, or Address..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="search-input"
@@ -500,18 +610,20 @@ export function AdminPortal() {
                 onChange={(e) => setAgentFilter(e.target.value)}
                 className="filter-select"
               >
-                <option value="ALL">All Assignment States</option>
+                <option value="ALL">All Assignments</option>
                 <option value="UNASSIGNED">Unassigned Only</option>
                 <option value="ASSIGNED">Assigned Only</option>
               </select>
             </div>
 
-            {/* Orders Table */}
+            {/* Table */}
             <section className="panel">
               {loading ? (
-                <p className="loading-state">Loading system-wide ordersâ€¦</p>
+                <p className="loading-state">Loading system-wide orders...</p>
               ) : filteredOrders.length === 0 ? (
-                <p className="empty-state">No orders matched the filter criteria.</p>
+                <div className="empty-state">
+                  <p>No orders match the selected search & filter criteria.</p>
+                </div>
               ) : (
                 <div className="orders-table-wrapper">
                   <table className="orders-table">
@@ -519,8 +631,8 @@ export function AdminPortal() {
                       <tr>
                         <th>Order #</th>
                         <th>Customer</th>
-                        <th>Assigned Agent</th>
-                        <th>Route (Pickup &rarr; Drop)</th>
+                        <th>Agent</th>
+                        <th>Route</th>
                         <th>Type & Payment</th>
                         <th>Charge</th>
                         <th>Status</th>
@@ -530,8 +642,12 @@ export function AdminPortal() {
                     <tbody>
                       {filteredOrders.map((order) => (
                         <tr key={order.id}>
-                          <td><strong>#{order.id}</strong></td>
-                          <td><span>User #{order.customerId}</span></td>
+                          <td>
+                            <strong>#{order.id}</strong>
+                          </td>
+                          <td>
+                            <span>User #{order.customerId}</span>
+                          </td>
                           <td>
                             {order.deliveryAgentId ? (
                               <span className="badge-agent-assigned">Agent #{order.deliveryAgentId}</span>
@@ -542,36 +658,35 @@ export function AdminPortal() {
                           <td>
                             <div className="route-cell">
                               <span className="route-zones">{order.pickupZone} &rarr; {order.dropZone}</span>
-                              <span className="route-address" title={order.dropAddress}>{order.dropAddress}</span>
+                              <span className="route-address" title={order.dropAddress}>
+                                {order.dropAddress}
+                              </span>
                             </div>
                           </td>
-                          <td><span className="badge-meta">{order.orderType} Â· {order.paymentType}</span></td>
-                          <td><strong>â‚¹{order.finalCharge != null ? Number(order.finalCharge).toFixed(2) : '0.00'}</strong></td>
-                          <td><StatusBadge status={order.status} /></td>
+                          <td>
+                            <span className="badge-meta">{order.orderType} - {order.paymentType}</span>
+                          </td>
+                          <td>
+                            <strong>{formatCurrency(order.finalCharge)}</strong>
+                          </td>
+                          <td>
+                            <StatusBadge status={order.status} />
+                          </td>
                           <td>
                             <div className="table-actions-group">
-                              <button
-                                type="button"
-                                className="btn-table-primary"
-                                onClick={() => setAssignModalOrder(order)}
-                                title="Assign delivery agent"
-                              >
-                                {order.deliveryAgentId ? 'Reassign' : 'Assign'}
-                              </button>
-                              <button
-                                type="button"
-                                className="btn-table-action"
-                                onClick={() => setStatusModalOrder(order)}
-                                disabled={order.status === 'DELIVERED'}
-                                title="Advance status"
-                              >
-                                Status
-                              </button>
+                              {!order.deliveryAgentId && (
+                                <button
+                                  type="button"
+                                  className="btn-table-primary"
+                                  onClick={() => setAssignModalOrder(order)}
+                                >
+                                  Assign
+                                </button>
+                              )}
                               <button
                                 type="button"
                                 className="btn-table-action"
                                 onClick={() => setSelectedOrderId(order.id)}
-                                title="View details and tracking"
                               >
                                 Details
                               </button>
@@ -587,16 +702,22 @@ export function AdminPortal() {
           </div>
         )}
 
-        {/* TAB 3: ASSIGNMENTS QUEUE */}
+        {/* TAB 3: UNASSIGNED ORDERS QUEUE */}
         {currentTab === 'assignments' && (
           <div className="dashboard-content">
             <div className="section-toolbar">
               <div>
-                <h2>Dispatch Assignments Queue</h2>
-                <p className="subtitle">Rapidly allocate active delivery drivers to pending, unassigned packages.</p>
+                <h2>Assignments Dispatch Queue</h2>
+                <p className="subtitle">Allocate available delivery partners to incoming unassigned packages.</p>
               </div>
-              <button type="button" className="btn-secondary" onClick={handleRefresh} disabled={loading}>
-                {loading ? 'Refreshingâ€¦' : 'Refresh Queue'}
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={handleRefresh}
+                disabled={loading}
+              >
+                <IconRefresh size={14} />
+                <span>{loading ? 'Refreshing...' : 'Refresh Queue'}</span>
               </button>
             </div>
 
@@ -604,13 +725,13 @@ export function AdminPortal() {
               <div className="heading">
                 <div>
                   <p className="eyebrow">UNASSIGNED PACKAGES</p>
-                  <h2>Orders Awaiting Driver ({unassignedOrders.length})</h2>
+                  <h2>Ready for Agent Assignment ({unassignedOrders.length})</h2>
                 </div>
               </div>
 
               {unassignedOrders.length === 0 ? (
                 <div className="empty-state">
-                  <p>ðŸŽ‰ All active orders have been assigned to delivery agents!</p>
+                  <p>All active orders have been assigned to delivery agents!</p>
                 </div>
               ) : (
                 <div className="orders-table-wrapper">
@@ -619,12 +740,11 @@ export function AdminPortal() {
                       <tr>
                         <th>Order #</th>
                         <th>Customer ID</th>
-                        <th>Route</th>
-                        <th>Address</th>
-                        <th>Weight & Type</th>
+                        <th>Pickup & Drop Location</th>
+                        <th>Weight & Specs</th>
                         <th>Charge</th>
                         <th>Status</th>
-                        <th>Quick Dispatch</th>
+                        <th>Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -632,29 +752,100 @@ export function AdminPortal() {
                         <tr key={order.id}>
                           <td><strong>#{order.id}</strong></td>
                           <td>User #{order.customerId}</td>
-                          <td><span className="route-zones">{order.pickupZone} &rarr; {order.dropZone}</span></td>
-                          <td><span className="route-address" title={order.dropAddress}>{order.dropAddress}</span></td>
+                          <td>
+                            <div className="route-cell">
+                              <span className="route-zones">{order.pickupZone} &rarr; {order.dropZone}</span>
+                              <span className="route-address">{order.pickupAddress} &rarr; {order.dropAddress}</span>
+                            </div>
+                          </td>
                           <td>
                             <span className="badge-meta">
-                              {order.chargeableWeightKg != null ? `${order.chargeableWeightKg} kg` : ''} Â· {order.orderType}
+                              {order.chargeableWeightKg != null ? `${order.chargeableWeightKg} kg` : ''} - {order.orderType}
                             </span>
                           </td>
-                          <td><strong>â‚¹{order.finalCharge != null ? Number(order.finalCharge).toFixed(2) : '0.00'}</strong></td>
+                          <td><strong>{formatCurrency(order.finalCharge)}</strong></td>
                           <td><StatusBadge status={order.status} /></td>
                           <td>
                             <button
                               type="button"
-                              className="btn-primary"
-                              style={{ padding: '6px 12px', fontSize: '12px' }}
+                              className="btn-table-primary"
                               onClick={() => setAssignModalOrder(order)}
                             >
-                              + Assign Agent
+                              Assign Driver
                             </button>
                           </td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+            </section>
+          </div>
+        )}
+
+        {/* TAB 4: DELIVERY AGENTS (FLEET) */}
+        {currentTab === 'agents' && (
+          <div className="dashboard-content">
+            <div className="section-toolbar">
+              <div>
+                <h2>Delivery Agents Fleet Directory</h2>
+                <p className="subtitle">Manage delivery partner roster, check online availability, and contact info.</p>
+              </div>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={handleRefresh}
+                disabled={loading}
+              >
+                <IconRefresh size={14} />
+                <span>{loading ? 'Refreshing...' : 'Refresh Fleet'}</span>
+              </button>
+            </div>
+
+            <section className="panel">
+              <div className="heading">
+                <div>
+                  <p className="eyebrow">ACTIVE FLEET</p>
+                  <h2>Available Delivery Agents ({agents.length})</h2>
+                </div>
+              </div>
+
+              {agents.length === 0 ? (
+                <p className="empty-state-notice">
+                  No delivery agents are currently available/online in the fleet.
+                </p>
+              ) : (
+                <div className="agent-directory-list">
+                  {agents.map((agent) => (
+                    <div key={agent.id} className="agent-row">
+                      <div className="agent-info">
+                        <span className={`dot ${agent.available ? 'dot-online' : 'dot-offline'}`} />
+                        <div>
+                          <strong>{agent.name}</strong>
+                          <span className="agent-meta">
+                            {agent.email}
+                            {agent.phone && (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: '6px' }}>
+                                <IconPhone size={12} /> {agent.phone}
+                              </span>
+                            )}
+                            {' '}- ID #{agent.id}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="table-actions-group">
+                        <button
+                          type="button"
+                          className="btn-danger-outline"
+                          onClick={() => handleDeleteAgent(agent.id, agent.name)}
+                          title="Remove user"
+                        >
+                          Remove Agent
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </section>
@@ -669,13 +860,29 @@ export function AdminPortal() {
                 <h2>Delivery Partner Applications</h2>
                 <p className="subtitle">Review driver credential submissions, verify licenses, and approve role promotions.</p>
               </div>
-              <button type="button" className="btn-secondary" onClick={handleRefresh} disabled={loading}>
-                {loading ? 'Refreshingâ€¦' : 'Refresh Applications'}
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={handleRefresh}
+                disabled={loading}
+              >
+                <IconRefresh size={14} />
+                <span>{loading ? 'Refreshing...' : 'Refresh Applications'}</span>
               </button>
             </div>
 
-            {appActionError && <div className="alert alert-error">{appActionError}</div>}
-            {appActionSuccess && <div className="alert alert-success">{appActionSuccess}</div>}
+            {appActionError && (
+              <div className="alert alert-error">
+                <IconAlert size={18} />
+                <span>{appActionError}</span>
+              </div>
+            )}
+            {appActionSuccess && (
+              <div className="alert alert-success">
+                <IconCheck size={18} />
+                <span>{appActionSuccess}</span>
+              </div>
+            )}
 
             {/* Applications Metric Row */}
             <section className="metrics-grid">
@@ -689,7 +896,7 @@ export function AdminPortal() {
             <div className="filter-bar">
               <input
                 type="text"
-                placeholder="Search by Applicant Name, Email, License, or Vehicleâ€¦"
+                placeholder="Search by Applicant Name, Email, License, or Vehicle..."
                 value={appSearchQuery}
                 onChange={(e) => setAppSearchQuery(e.target.value)}
                 className="search-input"
@@ -743,7 +950,11 @@ export function AdminPortal() {
                             <div className="route-cell">
                               <strong>{app.applicantName}</strong>
                               <span className="route-address" title={app.applicantEmail}>{app.applicantEmail}</span>
-                              {app.applicantPhone && <span className="time-text">ðŸ“ž {app.applicantPhone}</span>}
+                              {app.applicantPhone && (
+                                <span className="time-text" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                  <IconPhone size={11} /> {app.applicantPhone}
+                                </span>
+                              )}
                             </div>
                           </td>
                           <td>
@@ -763,7 +974,7 @@ export function AdminPortal() {
                           </td>
                           <td>
                             <span className="time-text">
-                              {app.createdAt ? new Date(app.createdAt).toLocaleDateString() : 'N/A'}
+                              {formatShortDate(app.createdAt)}
                             </span>
                           </td>
                           <td>
@@ -786,11 +997,12 @@ export function AdminPortal() {
                                 <button
                                   type="button"
                                   className="btn-table-primary"
-                                  style={{ background: '#16a34a' }}
+                                  style={{ background: '#16a34a', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                                   onClick={() => handleApproveApplication(app.id)}
                                   disabled={approveBusyId === app.id}
                                 >
-                                  {approveBusyId === app.id ? 'Approvingâ€¦' : 'âœ“ Approve'}
+                                  <IconCheck size={14} />
+                                  <span>{approveBusyId === app.id ? 'Approving...' : 'Approve'}</span>
                                 </button>
                                 <button
                                   type="button"
@@ -799,8 +1011,10 @@ export function AdminPortal() {
                                     setRejectingApp(app)
                                     setRejectionReason('')
                                   }}
+                                  style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                                 >
-                                  âœ• Reject
+                                  <IconX size={14} />
+                                  <span>Reject</span>
                                 </button>
                               </div>
                             ) : app.status === 'APPROVED' ? (
@@ -813,62 +1027,6 @@ export function AdminPortal() {
                       ))}
                     </tbody>
                   </table>
-                </div>
-              )}
-            </section>
-          </div>
-        )}
-
-        {/* TAB 4: DELIVERY AGENTS (FLEET) */}
-        {currentTab === 'agents' && (
-          <div className="dashboard-content">
-            <div className="section-toolbar">
-              <div>
-                <h2>Delivery Agents Fleet Directory</h2>
-                <p className="subtitle">Manage delivery partner roster, check online availability, and contact info.</p>
-              </div>
-              <button type="button" className="btn-secondary" onClick={handleRefresh} disabled={loading}>
-                {loading ? 'Refreshingâ€¦' : 'Refresh Fleet'}
-              </button>
-            </div>
-
-            <section className="panel">
-              <div className="heading">
-                <div>
-                  <p className="eyebrow">ACTIVE FLEET</p>
-                  <h2>Available Delivery Agents ({agents.length})</h2>
-                </div>
-              </div>
-
-              {agents.length === 0 ? (
-                <p className="empty-state-notice">
-                  No delivery agents are currently available/online in the fleet.
-                </p>
-              ) : (
-                <div className="agent-directory-list">
-                  {agents.map((agent) => (
-                    <div key={agent.id} className="agent-row">
-                      <div className="agent-info">
-                        <span className={`dot ${agent.available ? 'dot-online' : 'dot-offline'}`} />
-                        <div>
-                          <strong>{agent.name}</strong>
-                          <span className="agent-meta">
-                            {agent.email} {agent.phone ? `Â· ðŸ“ž ${agent.phone}` : ''} Â· ID #{agent.id}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="table-actions-group">
-                        <button
-                          type="button"
-                          className="btn-danger-outline"
-                          onClick={() => handleDeleteAgent(agent.id, agent.name)}
-                          title="Remove user"
-                        >
-                          Remove Agent
-                        </button>
-                      </div>
-                    </div>
-                  ))}
                 </div>
               )}
             </section>
@@ -904,14 +1062,20 @@ export function AdminPortal() {
                       required
                     />
                     <button type="submit" className="btn-primary" disabled={trackingLoading}>
-                      {trackingLoading ? 'Inspectingâ€¦' : 'Inspect Audit Log'}
+                      <IconSearch size={16} />
+                      <span>{trackingLoading ? 'Inspecting...' : 'Inspect Audit Log'}</span>
                     </button>
                   </div>
                 </label>
               </form>
             </div>
 
-            {trackingError && <div className="alert alert-error">{trackingError}</div>}
+            {trackingError && (
+              <div className="alert alert-error">
+                <IconAlert size={18} />
+                <span>{trackingError}</span>
+              </div>
+            )}
 
             {trackingSelectedOrder && (
               <div className="panel tracking-result-panel">
@@ -928,7 +1092,7 @@ export function AdminPortal() {
                   </div>
                   <div className="summary-charge">
                     <span className="label">Final Charge</span>
-                    <strong>â‚¹{trackingSelectedOrder.finalCharge != null ? Number(trackingSelectedOrder.finalCharge).toFixed(2) : '0.00'}</strong>
+                    <strong>{formatCurrency(trackingSelectedOrder.finalCharge)}</strong>
                   </div>
                 </div>
 
@@ -942,9 +1106,9 @@ export function AdminPortal() {
 
                   <div className="detail-card">
                     <h4>Logistics Specs</h4>
-                    <p><strong>Type:</strong> {trackingSelectedOrder.orderType} Â· {trackingSelectedOrder.paymentType}</p>
+                    <p><strong>Type:</strong> {trackingSelectedOrder.orderType} - {trackingSelectedOrder.paymentType}</p>
                     <p><strong>Billable Weight:</strong> {trackingSelectedOrder.chargeableWeightKg != null ? `${trackingSelectedOrder.chargeableWeightKg} kg` : 'N/A'}</p>
-                    <p><strong>Created Date:</strong> {new Date(trackingSelectedOrder.createdAt).toLocaleString()}</p>
+                    <p><strong>Created Date:</strong> {formatDate(trackingSelectedOrder.createdAt)}</p>
                   </div>
                 </div>
 
@@ -1008,7 +1172,7 @@ export function AdminPortal() {
         {rejectingApp && (
           <form onSubmit={handleRejectApplication} className="modal-form">
             <p className="form-description">
-              Please specify the reason for rejecting <strong>{rejectingApp.applicantName}</strong>'s application. The applicant will see this feedback and may reapply.
+              Please specify the reason for rejecting <strong>{rejectingApp.applicantName}</strong>&apos;s application. The applicant will see this feedback and may reapply.
             </p>
 
             <label>
@@ -1037,7 +1201,7 @@ export function AdminPortal() {
                 className="btn-primary"
                 style={{ background: '#b91c1c', borderColor: '#b91c1c' }}
               >
-                {rejectBusy ? 'Rejectingâ€¦' : 'Confirm Rejection'}
+                {rejectBusy ? 'Rejecting...' : 'Confirm Rejection'}
               </button>
             </div>
           </form>

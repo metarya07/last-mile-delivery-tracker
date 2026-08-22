@@ -148,7 +148,7 @@ export function StatusTransitionModal({ isOpen, onClose, order, onStatusUpdated 
                   Cancel
                 </button>
                 <button type="submit" disabled={busy} className="btn-primary">
-                  {busy ? 'Updatingâ€¦' : 'Confirm Status Change'}
+                  {busy ? 'Updating...' : 'Confirm Status Change'}
                 </button>
               </div>
             </>

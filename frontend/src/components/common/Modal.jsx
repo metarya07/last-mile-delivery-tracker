@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { IconX } from './Icons'
 
 export function Modal({ isOpen, onClose, title, subtitle, children, maxWidth = '540px' }) {
   useEffect(() => {
@@ -28,7 +29,7 @@ export function Modal({ isOpen, onClose, title, subtitle, children, maxWidth = '
             <h2>{title}</h2>
           </div>
           <button className="btn-close" onClick={onClose} aria-label="Close modal">
-            &times;
+            <IconX size={18} />
           </button>
         </div>
         <div className="modal-body">{children}</div>

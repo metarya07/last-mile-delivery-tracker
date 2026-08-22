@@ -5,6 +5,7 @@ import { MetricCard } from '../components/common/MetricCard'
 import { StatusBadge } from '../components/common/StatusBadge'
 import { CreateOrderModal } from '../components/customer/CreateOrderModal'
 import { OrderDetailModal } from '../components/tracking/OrderDetailModal'
+import { formatCurrency } from '../utils/formatters'
 
 export function CustomerDashboard() {
   const [orders, setOrders] = useState([])
@@ -91,12 +92,12 @@ export function CustomerDashboard() {
             <h2>Order History & Live Tracking</h2>
           </div>
           <button type="button" className="btn-secondary" onClick={handleRefresh} disabled={loading}>
-            {loading ? 'Refreshingâ€¦' : 'Refresh'}
+            {loading ? 'Refreshing...' : 'Refresh'}
           </button>
         </div>
 
         {loading ? (
-          <p className="loading-state">Loading your shipmentsâ€¦</p>
+          <p className="loading-state">Loading your shipments...</p>
         ) : orders.length === 0 ? (
           <div className="empty-state">
             <p>No delivery orders placed yet.</p>
@@ -138,10 +139,10 @@ export function CustomerDashboard() {
                       </div>
                     </td>
                     <td>
-                      <span className="badge-meta">{order.orderType} Â· {order.paymentType}</span>
+                      <span className="badge-meta">{order.orderType} - {order.paymentType}</span>
                     </td>
                     <td>
-                      <strong>â‚¹{order.finalCharge != null ? Number(order.finalCharge).toFixed(2) : '0.00'}</strong>
+                      <strong>{formatCurrency(order.finalCharge)}</strong>
                     </td>
                     <td>
                       <StatusBadge status={order.status} />

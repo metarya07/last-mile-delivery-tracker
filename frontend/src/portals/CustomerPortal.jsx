@@ -11,10 +11,25 @@ import { TrackingTimeline } from '../components/tracking/TrackingTimeline'
 import { DeliveryAttemptsList } from '../components/tracking/DeliveryAttemptsList'
 import { ForgotPasswordModal } from '../components/auth/ForgotPasswordModal'
 import { deliveryPartnerApplicationApi } from '../api/deliveryPartnerApplicationApi'
+import {
+  IconTruck,
+  IconPackage,
+  IconPlus,
+  IconSearch,
+  IconUser,
+  IconPartner,
+  IconRefresh,
+  IconMenu,
+  IconLock,
+  IconAlert,
+  IconCheck,
+} from '../components/common/Icons'
+import { formatCurrency, formatDate, formatShortDate } from '../utils/formatters'
 
 export function CustomerPortal() {
   const { user, logout } = useAuth()
   const [currentTab, setCurrentTab] = useState('dashboard') // 'dashboard' | 'orders' | 'create' | 'tracking' | 'profile' | 'become-partner'
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   const [orders, setOrders] = useState([])
   const [summary, setSummary] = useState({})
@@ -168,19 +183,63 @@ export function CustomerPortal() {
 
   const handleTrackTabOpen = (orderId) => {
     setCurrentTab('tracking')
+    setMobileNavOpen(false)
     if (orderId) {
       setTrackingSearchId(orderId.toString())
       performTrackingLookup(orderId)
     }
   }
 
+  const switchTab = (tab) => {
+    setCurrentTab(tab)
+    setMobileNavOpen(false)
+  }
+
   return (
     <div className="shell customer-shell">
+      {/* Mobile Topbar */}
+      <header className="mobile-topbar">
+        <button
+          type="button"
+          className="mobile-menu-btn"
+          onClick={() => setMobileNavOpen((prev) => !prev)}
+          aria-label="Toggle navigation"
+        >
+          <IconMenu size={22} />
+        </button>
+        <div className="mobile-topbar-brand">
+          <IconTruck size={20} className="brand-icon" />
+          <span>LastMile Dispatch</span>
+        </div>
+        <button
+          type="button"
+          className="mobile-user-btn"
+          onClick={() => switchTab('profile')}
+          aria-label="Profile"
+        >
+          <IconUser size={18} />
+        </button>
+      </header>
+
+      {/* Backdrop for mobile drawer */}
+      {mobileNavOpen && (
+        <div
+          className="sidebar-backdrop"
+          onClick={() => setMobileNavOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Customer Sidebar Navigation */}
-      <aside className="portal-sidebar customer-sidebar">
+      <aside className={`portal-sidebar customer-sidebar ${mobileNavOpen ? 'open' : ''}`}>
         <div className="aside-brand">
-          <p className="eyebrow">CUSTOMER PORTAL</p>
-          <h2>LastMile Dispatch</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <IconTruck size={22} className="brand-icon" />
+            <div>
+              <p className="eyebrow">CUSTOMER PORTAL</p>
+              <h2>LastMile Dispatch</h2>
+            </div>
+          </div>
         </div>
 
         <nav>
@@ -189,48 +248,54 @@ export function CustomerPortal() {
             <button
               type="button"
               className={`nav-link-btn ${currentTab === 'dashboard' ? 'active' : ''}`}
-              onClick={() => setCurrentTab('dashboard')}
+              onClick={() => switchTab('dashboard')}
             >
-              Dashboard
+              <IconPackage size={16} />
+              <span>Dashboard</span>
             </button>
             <button
               type="button"
               className={`nav-link-btn ${currentTab === 'orders' ? 'active' : ''}`}
-              onClick={() => setCurrentTab('orders')}
+              onClick={() => switchTab('orders')}
             >
-              My Orders ({orders.length})
+              <IconPackage size={16} />
+              <span>My Orders ({orders.length})</span>
             </button>
             <button
               type="button"
               className={`nav-link-btn ${currentTab === 'create' ? 'active' : ''}`}
-              onClick={() => setCurrentTab('create')}
+              onClick={() => switchTab('create')}
             >
-              + Create Order
+              <IconPlus size={16} />
+              <span>Book Delivery</span>
             </button>
             <button
               type="button"
               className={`nav-link-btn ${currentTab === 'tracking' ? 'active' : ''}`}
-              onClick={() => setCurrentTab('tracking')}
+              onClick={() => switchTab('tracking')}
             >
-              Order Tracking
+              <IconSearch size={16} />
+              <span>Order Tracking</span>
             </button>
             <button
               type="button"
               className={`nav-link-btn ${currentTab === 'profile' ? 'active' : ''}`}
-              onClick={() => setCurrentTab('profile')}
+              onClick={() => switchTab('profile')}
             >
-              Profile & Account
+              <IconUser size={16} />
+              <span>Profile & Account</span>
             </button>
             <button
               type="button"
               className={`nav-link-btn nav-partner-highlight ${currentTab === 'become-partner' ? 'active' : ''}`}
               onClick={() => {
-                setCurrentTab('become-partner')
+                switchTab('become-partner')
                 setPartnerAppError('')
                 setPartnerAppSuccess('')
               }}
             >
-              ðŸ¤ Become a Delivery Partner {partnerApp?.status === 'PENDING' ? '(Pending)' : partnerApp?.status === 'APPROVED' ? '(Approved)' : ''}
+              <IconPartner size={16} />
+              <span>Become a Partner {partnerApp?.status === 'PENDING' ? '(Pending)' : partnerApp?.status === 'APPROVED' ? '(Approved)' : ''}</span>
             </button>
           </div>
         </nav>
@@ -251,8 +316,8 @@ export function CustomerPortal() {
       <main className="workspace">
         <header className="workspace-header">
           <div>
-            <span className="role-tag">CUSTOMER PORTAL</span>
-            <h1>Welcome, {user?.name}.</h1>
+            <span className="role-tag">CUSTOMER ACCESS</span>
+            <h1>Customer Operations Desk</h1>
           </div>
           <div className="header-actions">
             <button
@@ -260,7 +325,8 @@ export function CustomerPortal() {
               className="btn-primary"
               onClick={() => setCreateModalOpen(true)}
             >
-              + Book Delivery
+              <IconPlus size={16} />
+              <span>New Shipment</span>
             </button>
             <button type="button" className="btn-secondary" onClick={logout}>
               Sign Out
@@ -268,54 +334,86 @@ export function CustomerPortal() {
           </div>
         </header>
 
-        {error && <div className="alert alert-error">{error}</div>}
+        {error && (
+          <div className="alert alert-error">
+            <IconAlert size={18} />
+            <span>{error}</span>
+          </div>
+        )}
 
-        {/* TAB 1: DASHBOARD */}
+        {/* TAB 1: CUSTOMER DASHBOARD */}
         {currentTab === 'dashboard' && (
           <div className="dashboard-content">
             <div className="section-toolbar">
               <div>
-                <h2>Customer Dashboard</h2>
-                <p className="subtitle">Track your delivery lifecycle, live shipments, and dispatch records.</p>
+                <h2>Delivery Overview</h2>
+                <p className="subtitle">Track your package dispatches, transit updates, and fulfillment.</p>
               </div>
-              <button type="button" className="btn-secondary" onClick={handleRefresh} disabled={loading}>
-                {loading ? 'Refreshingâ€¦' : 'Refresh Data'}
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={handleRefresh}
+                disabled={loading}
+              >
+                <IconRefresh size={14} />
+                <span>{loading ? 'Refreshing...' : 'Refresh Data'}</span>
               </button>
             </div>
 
-            {/* Metrics */}
+            {/* Metrics Overview */}
             <section className="metrics-grid">
-              <MetricCard label="Total Orders" value={summary.total ?? orders.length} />
+              <MetricCard label="Total Orders Placed" value={summary.total ?? orders.length} />
               <MetricCard label="In Transit" value={summary.IN_TRANSIT ?? 0} />
-              <MetricCard label="Out for Delivery" value={summary.OUT_FOR_DELIVERY ?? 0} />
-              <MetricCard label="Delivered" value={summary.DELIVERED ?? 0} />
+              <MetricCard label="Delivered Packages" value={summary.DELIVERED ?? 0} />
+              <MetricCard label="Needs Attention / Failed" value={summary.FAILED ?? 0} />
             </section>
 
-            {/* Quick Actions / Recent Orders Highlights */}
+            {/* Quick Actions & Recent Orders Banner */}
+            <section className="panel dispatch-alert-banner">
+              <div>
+                <p className="eyebrow">NEED TO SEND A PARCEL?</p>
+                <h3>Book Instant Door-to-Door Delivery</h3>
+                <p style={{ color: 'var(--text-muted)', fontSize: '14px', marginTop: '4px' }}>
+                  Select pickup and drop zones with automatic weight & volumetric fare calculation.
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={() => setCurrentTab('create')}
+              >
+                <IconPlus size={16} />
+                <span>Open Booking Desk</span>
+              </button>
+            </section>
+
+            {/* Recent Shipments Panel */}
             <section className="panel">
               <div className="heading">
                 <div>
-                  <p className="eyebrow">RECENT DISPATCHES</p>
-                  <h2>Latest Shipments</h2>
+                  <p className="eyebrow">RECENT SHIPMENTS</p>
+                  <h2>Latest Dispatches</h2>
                 </div>
-                <button
-                  type="button"
-                  className="btn-link"
-                  onClick={() => setCurrentTab('orders')}
-                >
-                  View All Orders &rarr;
-                </button>
+                {orders.length > 5 && (
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    onClick={() => setCurrentTab('orders')}
+                  >
+                    View All ({orders.length})
+                  </button>
+                )}
               </div>
 
               {loading ? (
-                <p className="loading-state">Loading your shipmentsâ€¦</p>
+                <p className="loading-state">Loading your shipments...</p>
               ) : orders.length === 0 ? (
                 <div className="empty-state">
-                  <p>No delivery orders placed yet.</p>
+                  <p>You have not created any delivery orders yet.</p>
                   <button
                     type="button"
                     className="btn-primary"
-                    onClick={() => setCurrentTab('create')}
+                    onClick={() => setCreateModalOpen(true)}
                     style={{ marginTop: '12px' }}
                   >
                     Book Your First Delivery
@@ -327,41 +425,57 @@ export function CustomerPortal() {
                     <thead>
                       <tr>
                         <th>Order #</th>
-                        <th>Route</th>
+                        <th>Route (Pickup &rarr; Drop)</th>
                         <th>Type & Payment</th>
                         <th>Charge</th>
                         <th>Status</th>
+                        <th>Created At</th>
                         <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {orders.slice(0, 5).map((order) => (
                         <tr key={order.id}>
-                          <td><strong>#{order.id}</strong></td>
+                          <td>
+                            <strong>#{order.id}</strong>
+                          </td>
                           <td>
                             <div className="route-cell">
                               <span className="route-zones">{order.pickupZone} &rarr; {order.dropZone}</span>
-                              <span className="route-address" title={order.dropAddress}>To: {order.dropAddress}</span>
+                              <span className="route-address" title={order.dropAddress}>
+                                To: {order.dropAddress}
+                              </span>
                             </div>
                           </td>
-                          <td><span className="badge-meta">{order.orderType} Â· {order.paymentType}</span></td>
-                          <td><strong>â‚¹{order.finalCharge != null ? Number(order.finalCharge).toFixed(2) : '0.00'}</strong></td>
-                          <td><StatusBadge status={order.status} /></td>
+                          <td>
+                            <span className="badge-meta">{order.orderType} - {order.paymentType}</span>
+                          </td>
+                          <td>
+                            <strong>{formatCurrency(order.finalCharge)}</strong>
+                          </td>
+                          <td>
+                            <StatusBadge status={order.status} />
+                          </td>
+                          <td>
+                            <span className="time-text">
+                              {formatShortDate(order.createdAt)}
+                            </span>
+                          </td>
                           <td>
                             <div className="table-actions-group">
-                              <button
-                                type="button"
-                                className="btn-table-primary"
-                                onClick={() => handleTrackTabOpen(order.id)}
-                              >
-                                Live Track
-                              </button>
                               <button
                                 type="button"
                                 className="btn-table-action"
                                 onClick={() => setSelectedOrderId(order.id)}
                               >
                                 Details
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-table-primary"
+                                onClick={() => handleTrackTabOpen(order.id)}
+                              >
+                                Track
                               </button>
                             </div>
                           </td>
@@ -375,33 +489,40 @@ export function CustomerPortal() {
           </div>
         )}
 
-        {/* TAB 2: MY ORDERS */}
+        {/* TAB 2: MY ORDERS LIST (WITH FILTERING) */}
         {currentTab === 'orders' && (
           <div className="dashboard-content">
             <div className="section-toolbar">
               <div>
-                <h2>My Orders</h2>
-                <p className="subtitle">Comprehensive history of all your placed delivery orders.</p>
+                <h2>My Orders Directory</h2>
+                <p className="subtitle">Search, filter, and inspect all packages placed under your customer account.</p>
               </div>
-              <div className="toolbar-actions">
+              <div style={{ display: 'flex', gap: '8px' }}>
                 <button
                   type="button"
                   className="btn-primary"
                   onClick={() => setCreateModalOpen(true)}
                 >
-                  + Book New Delivery
+                  <IconPlus size={14} />
+                  <span>+ Create Order</span>
                 </button>
-                <button type="button" className="btn-secondary" onClick={handleRefresh} disabled={loading}>
-                  {loading ? 'Refreshingâ€¦' : 'Refresh'}
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={handleRefresh}
+                  disabled={loading}
+                >
+                  <IconRefresh size={14} />
+                  <span>{loading ? 'Refreshing...' : 'Refresh'}</span>
                 </button>
               </div>
             </div>
 
-            {/* Filter toolbar */}
+            {/* Filter Bar */}
             <div className="filter-bar">
               <input
                 type="text"
-                placeholder="Search by Order #, zone, or addressâ€¦"
+                placeholder="Search by Order #, zone, or address..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="search-input"
@@ -422,13 +543,13 @@ export function CustomerPortal() {
               </select>
             </div>
 
-            {/* Orders Table */}
+            {/* Full Orders Table */}
             <section className="panel">
               {loading ? (
-                <p className="loading-state">Loading your shipmentsâ€¦</p>
+                <p className="loading-state">Loading your shipments...</p>
               ) : filteredOrders.length === 0 ? (
                 <div className="empty-state">
-                  <p>No orders matched your criteria.</p>
+                  <p>No orders match the selected filters.</p>
                 </div>
               ) : (
                 <div className="orders-table-wrapper">
@@ -436,59 +557,57 @@ export function CustomerPortal() {
                     <thead>
                       <tr>
                         <th>Order #</th>
-                        <th>Route (Pickup &rarr; Drop)</th>
-                        <th>Dimensions & Weight</th>
+                        <th>Pickup & Drop Routes</th>
                         <th>Type & Payment</th>
                         <th>Charge</th>
                         <th>Status</th>
-                        <th>Date</th>
+                        <th>Created At</th>
                         <th>Actions</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredOrders.map((order) => (
                         <tr key={order.id}>
-                          <td><strong>#{order.id}</strong></td>
+                          <td>
+                            <strong>#{order.id}</strong>
+                          </td>
                           <td>
                             <div className="route-cell">
                               <span className="route-zones">{order.pickupZone} &rarr; {order.dropZone}</span>
-                              <span className="route-address" title={order.dropAddress}>To: {order.dropAddress}</span>
+                              <span className="route-address" title={order.dropAddress}>
+                                {order.dropAddress}
+                              </span>
                             </div>
                           </td>
                           <td>
-                            <span className="badge-meta">
-                              {order.chargeableWeightKg != null ? `${order.chargeableWeightKg} kg` : 'N/A'}
-                            </span>
+                            <span className="badge-meta">{order.orderType} - {order.paymentType}</span>
                           </td>
                           <td>
-                            <span className="badge-meta">{order.orderType} Â· {order.paymentType}</span>
-                          </td>
-                          <td>
-                            <strong>â‚¹{order.finalCharge != null ? Number(order.finalCharge).toFixed(2) : '0.00'}</strong>
+                            <strong>{formatCurrency(order.finalCharge)}</strong>
                           </td>
                           <td>
                             <StatusBadge status={order.status} />
                           </td>
                           <td>
                             <span className="time-text">
-                              {order.createdAt ? new Date(order.createdAt).toLocaleDateString() : 'N/A'}
+                              {formatShortDate(order.createdAt)}
                             </span>
                           </td>
                           <td>
                             <div className="table-actions-group">
                               <button
                                 type="button"
-                                className="btn-table-primary"
-                                onClick={() => handleTrackTabOpen(order.id)}
-                              >
-                                Track
-                              </button>
-                              <button
-                                type="button"
                                 className="btn-table-action"
                                 onClick={() => setSelectedOrderId(order.id)}
                               >
                                 Details
+                              </button>
+                              <button
+                                type="button"
+                                className="btn-table-primary"
+                                onClick={() => handleTrackTabOpen(order.id)}
+                              >
+                                Live Track
                               </button>
                             </div>
                           </td>
@@ -502,24 +621,30 @@ export function CustomerPortal() {
           </div>
         )}
 
-        {/* TAB 3: CREATE ORDER */}
+        {/* TAB 3: CREATE ORDER DESK */}
         {currentTab === 'create' && (
           <div className="dashboard-content">
+            <div className="section-toolbar">
+              <div>
+                <h2>Create Delivery Order</h2>
+                <p className="subtitle">Specify route locations, parcel dimensions, and billing options.</p>
+              </div>
+            </div>
             <CreateOrderView onOrderCreated={handleOrderCreated} />
           </div>
         )}
 
-        {/* TAB 4: ORDER TRACKING */}
+        {/* TAB 4: ORDER TRACKING & AUDIT */}
         {currentTab === 'tracking' && (
           <div className="dashboard-content">
             <div className="section-toolbar">
               <div>
-                <h2>Order Tracking Desk</h2>
-                <p className="subtitle">Real-time milestones, carrier transition audit, and delivery attempt logs.</p>
+                <h2>Order Tracking & Delivery History</h2>
+                <p className="subtitle">Real-time status milestones and recorded delivery attempt logs.</p>
               </div>
             </div>
 
-            {/* Tracking Search Input Card */}
+            {/* Tracking Search Card */}
             <div className="panel tracking-search-panel">
               <form
                 onSubmit={(e) => {
@@ -533,100 +658,53 @@ export function CustomerPortal() {
                   <div className="search-bar-row">
                     <input
                       type="number"
-                      placeholder="e.g. 7"
+                      placeholder="e.g. 1"
                       value={trackingSearchId}
                       onChange={(e) => setTrackingSearchId(e.target.value)}
                       required
                     />
                     <button type="submit" className="btn-primary" disabled={trackingLoading}>
-                      {trackingLoading ? 'Searchingâ€¦' : 'Track Order'}
+                      <IconSearch size={16} />
+                      <span>{trackingLoading ? 'Searching...' : 'Track Order'}</span>
                     </button>
                   </div>
                 </label>
               </form>
-
-              {/* Quick Picker from Recent Orders */}
-              {orders.length > 0 && (
-                <div className="quick-track-pills">
-                  <span>Quick Select Your Recent Orders:</span>
-                  <div className="pills-row">
-                    {orders.slice(0, 6).map((o) => (
-                      <button
-                        key={o.id}
-                        type="button"
-                        className={`pill-btn ${trackingSelectedOrder?.id === o.id ? 'active' : ''}`}
-                        onClick={() => {
-                          setTrackingSearchId(o.id.toString())
-                          performTrackingLookup(o.id)
-                        }}
-                      >
-                        #{o.id} ({o.status})
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
 
-            {trackingError && <div className="alert alert-error">{trackingError}</div>}
+            {trackingError && (
+              <div className="alert alert-error">
+                <IconAlert size={18} />
+                <span>{trackingError}</span>
+              </div>
+            )}
 
-            {/* Tracking Results View */}
             {trackingSelectedOrder && (
               <div className="panel tracking-result-panel">
                 <div className="order-summary-strip">
                   <div>
-                    <span className="label">Order Status</span>
+                    <span className="label">Order #{trackingSelectedOrder.id} Status</span>
                     <div style={{ marginTop: '4px' }}>
                       <StatusBadge status={trackingSelectedOrder.status} />
                     </div>
                   </div>
-                  <div>
-                    <span className="label">Tracking Order</span>
-                    <strong style={{ fontSize: '18px' }}>#{trackingSelectedOrder.id}</strong>
-                  </div>
                   <div className="summary-charge">
-                    <span className="label">Charge</span>
-                    <strong>â‚¹{trackingSelectedOrder.finalCharge != null ? Number(trackingSelectedOrder.finalCharge).toFixed(2) : '0.00'}</strong>
+                    <span className="label">Final Charge</span>
+                    <strong>{formatCurrency(trackingSelectedOrder.finalCharge)}</strong>
                   </div>
                 </div>
 
                 <div className="order-details-grid">
                   <div className="detail-card">
-                    <h4>Route & Shipment</h4>
-                    <div className="route-block">
-                      <div className="route-stop">
-                        <span className="route-dot pickup-dot" />
-                        <div>
-                          <small>Pickup Zone ({trackingSelectedOrder.pickupZone})</small>
-                          <p>{trackingSelectedOrder.pickupAddress}</p>
-                        </div>
-                      </div>
-                      <div className="route-stop">
-                        <span className="route-dot drop-dot" />
-                        <div>
-                          <small>Drop Zone ({trackingSelectedOrder.dropZone})</small>
-                          <p>{trackingSelectedOrder.dropAddress}</p>
-                        </div>
-                      </div>
-                    </div>
+                    <h4>Route Information</h4>
+                    <p><strong>Pickup:</strong> {trackingSelectedOrder.pickupAddress} ({trackingSelectedOrder.pickupZone})</p>
+                    <p><strong>Drop:</strong> {trackingSelectedOrder.dropAddress} ({trackingSelectedOrder.dropZone})</p>
                   </div>
-
                   <div className="detail-card">
-                    <h4>Order Information</h4>
-                    <div className="specs-table">
-                      <div className="spec-row">
-                        <span>Chargeable Weight:</span>
-                        <strong>{trackingSelectedOrder.chargeableWeightKg != null ? `${trackingSelectedOrder.chargeableWeightKg} kg` : 'N/A'}</strong>
-                      </div>
-                      <div className="spec-row">
-                        <span>Order Type:</span>
-                        <span>{trackingSelectedOrder.orderType}</span>
-                      </div>
-                      <div className="spec-row">
-                        <span>Payment Type:</span>
-                        <span>{trackingSelectedOrder.paymentType}</span>
-                      </div>
-                    </div>
+                    <h4>Logistics Specs</h4>
+                    <p><strong>Type:</strong> {trackingSelectedOrder.orderType} - {trackingSelectedOrder.paymentType}</p>
+                    <p><strong>Billable Weight:</strong> {trackingSelectedOrder.chargeableWeightKg != null ? `${trackingSelectedOrder.chargeableWeightKg} kg` : 'N/A'}</p>
+                    <p><strong>Created:</strong> {formatDate(trackingSelectedOrder.createdAt)}</p>
                   </div>
                 </div>
 
@@ -713,8 +791,18 @@ export function CustomerPortal() {
               </div>
             </div>
 
-            {partnerAppError && <div className="alert alert-error">{partnerAppError}</div>}
-            {partnerAppSuccess && <div className="alert alert-success">{partnerAppSuccess}</div>}
+            {partnerAppError && (
+              <div className="alert alert-error">
+                <IconAlert size={18} />
+                <span>{partnerAppError}</span>
+              </div>
+            )}
+            {partnerAppSuccess && (
+              <div className="alert alert-success">
+                <IconCheck size={18} />
+                <span>{partnerAppSuccess}</span>
+              </div>
+            )}
 
             {/* STATE 1: PENDING APPLICATION */}
             {partnerApp && partnerApp.status === 'PENDING' && (
@@ -734,9 +822,7 @@ export function CustomerPortal() {
                   </div>
                   <div className="summary-field">
                     <span className="field-label">Submitted On</span>
-                    <span className="field-value">
-                      {partnerApp.createdAt ? new Date(partnerApp.createdAt).toLocaleString() : 'N/A'}
-                    </span>
+                    <span className="field-value">{formatDate(partnerApp.createdAt)}</span>
                   </div>
                   <div className="summary-field">
                     <span className="field-label">Vehicle Type</span>
@@ -757,7 +843,10 @@ export function CustomerPortal() {
                 </div>
 
                 <div className="application-locked-notice">
-                  <p>ðŸ”’ Active applications are locked to prevent duplicate submissions. You will see your updated status here.</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <IconLock size={16} />
+                    <p>Active applications are locked to prevent duplicate submissions. You will see your updated status here.</p>
+                  </div>
                 </div>
               </div>
             )}
@@ -803,7 +892,7 @@ export function CustomerPortal() {
                     <strong>Admin Review Notes / Rejection Reason:</strong>
                     <p>{partnerApp.rejectionReason}</p>
                     <small>
-                      Reviewed by {partnerApp.reviewedByName || 'Administrator'} on {partnerApp.reviewedAt ? new Date(partnerApp.reviewedAt).toLocaleString() : 'N/A'}
+                      Reviewed by {partnerApp.reviewedByName || 'Administrator'} on {formatDate(partnerApp.reviewedAt)}
                     </small>
                   </div>
                 )}
@@ -822,7 +911,7 @@ export function CustomerPortal() {
                     }}
                     style={{ marginTop: '10px' }}
                   >
-                    ðŸ”„ Submit Corrected Application
+                    Submit Corrected Application
                   </button>
                 </div>
               </div>
@@ -900,11 +989,11 @@ export function CustomerPortal() {
                         value={appPreferredArea}
                         onChange={(e) => setAppPreferredArea(e.target.value)}
                       >
-                        <option value="North Zone">Zone 1 â€” North Zone</option>
-                        <option value="South Zone">Zone 2 â€” South Zone</option>
-                        <option value="East Zone">Zone 3 â€” East Zone</option>
-                        <option value="West Zone">Zone 4 â€” West Zone</option>
-                        <option value="Central Zone">Zone 5 â€” Central Zone</option>
+                        <option value="North Zone">Zone 1 - North Zone</option>
+                        <option value="South Zone">Zone 2 - South Zone</option>
+                        <option value="East Zone">Zone 3 - East Zone</option>
+                        <option value="West Zone">Zone 4 - West Zone</option>
+                        <option value="Central Zone">Zone 5 - Central Zone</option>
                         <option value="All Zones">All City Zones</option>
                       </select>
                     </label>
@@ -912,7 +1001,7 @@ export function CustomerPortal() {
 
                   <div className="partner-terms-box">
                     <p>
-                      ðŸ“‹ By submitting this application, you confirm that your driving license and vehicle documents are valid. Administrators will verify details before activation.
+                      By submitting this application, you confirm that your driving license and vehicle documents are valid. Administrators will verify details before activation.
                     </p>
                   </div>
 
@@ -922,7 +1011,7 @@ export function CustomerPortal() {
                       disabled={appSubmitting}
                       className="btn-primary"
                     >
-                      {appSubmitting ? 'Submitting Applicationâ€¦' : 'Submit Application for Review'}
+                      {appSubmitting ? 'Submitting Application...' : 'Submit Application for Review'}
                     </button>
                   </div>
                 </form>

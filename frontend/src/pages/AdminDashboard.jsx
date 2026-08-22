@@ -7,6 +7,7 @@ import { AssignAgentModal } from '../components/admin/AssignAgentModal'
 import { AgentListModal } from '../components/admin/AgentListModal'
 import { StatusTransitionModal } from '../components/agent/StatusTransitionModal'
 import { OrderDetailModal } from '../components/tracking/OrderDetailModal'
+import { formatCurrency } from '../utils/formatters'
 
 export function AdminDashboard() {
   const [orders, setOrders] = useState([])
@@ -103,12 +104,12 @@ export function AdminDashboard() {
             <h2>All System Orders</h2>
           </div>
           <button type="button" className="btn-secondary" onClick={handleRefresh} disabled={loading}>
-            {loading ? 'Refreshingâ€¦' : 'Refresh'}
+            {loading ? 'Refreshing...' : 'Refresh'}
           </button>
         </div>
 
         {loading ? (
-          <p className="loading-state">Loading system-wide ordersâ€¦</p>
+          <p className="loading-state">Loading system-wide orders...</p>
         ) : orders.length === 0 ? (
           <p className="empty-state">No orders registered in the system yet.</p>
         ) : (
@@ -150,7 +151,7 @@ export function AdminDashboard() {
                       </div>
                     </td>
                     <td>
-                      <strong>â‚¹{order.finalCharge != null ? Number(order.finalCharge).toFixed(2) : '0.00'}</strong>
+                      <strong>{formatCurrency(order.finalCharge)}</strong>
                     </td>
                     <td>
                       <StatusBadge status={order.status} />

@@ -30,7 +30,7 @@ export function ForgotPasswordModal({ isOpen, onClose, initialEmail = '' }) {
     setError('')
     try {
       await authApi.forgotPassword(email.trim())
-      setSuccessMsg(`OTP sent to ${email}. Please check your inbox (and SMS if registered).`)
+      setSuccessMsg(`OTP sent to ${email}. Please check your inbox.`)
       setStep(2)
     } catch (err) {
       setError(err.message || 'Failed to send OTP')
@@ -115,7 +115,7 @@ export function ForgotPasswordModal({ isOpen, onClose, initialEmail = '' }) {
               Cancel
             </button>
             <button type="submit" disabled={busy} className="btn-primary">
-              {busy ? 'Sending OTPâ€¦' : 'Send Verification OTP'}
+              {busy ? 'Sending OTP...' : 'Send Verification OTP'}
             </button>
           </div>
         </form>
@@ -140,11 +140,18 @@ export function ForgotPasswordModal({ isOpen, onClose, initialEmail = '' }) {
             />
           </label>
           <div className="form-actions">
-            <button type="button" className="btn-secondary" onClick={() => { setError(''); setStep(1) }}>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => {
+                setError('')
+                setStep(1)
+              }}
+            >
               Back
             </button>
             <button type="submit" disabled={busy || otp.length !== 6} className="btn-primary">
-              {busy ? 'Verifyingâ€¦' : 'Verify OTP'}
+              {busy ? 'Verifying...' : 'Verify OTP'}
             </button>
           </div>
         </form>
@@ -152,9 +159,7 @@ export function ForgotPasswordModal({ isOpen, onClose, initialEmail = '' }) {
 
       {step === 3 && (
         <form onSubmit={handleResetPassword} className="modal-form">
-          <p className="form-description">
-            Create a secure new password (at least 8 characters).
-          </p>
+          <p className="form-description">Create a secure new password (at least 8 characters).</p>
           <label>
             New Password
             <input
@@ -181,11 +186,18 @@ export function ForgotPasswordModal({ isOpen, onClose, initialEmail = '' }) {
             />
           </label>
           <div className="form-actions">
-            <button type="button" className="btn-secondary" onClick={() => { setError(''); setStep(2) }}>
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => {
+                setError('')
+                setStep(2)
+              }}
+            >
               Back
             </button>
             <button type="submit" disabled={busy} className="btn-primary">
-              {busy ? 'Savingâ€¦' : 'Reset Password'}
+              {busy ? 'Saving...' : 'Reset Password'}
             </button>
           </div>
         </form>

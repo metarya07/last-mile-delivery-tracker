@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { userApi } from '../../api/userApi'
 import { Modal } from '../common/Modal'
+import { IconPhone } from '../common/Icons'
 
 export function AgentListModal({ isOpen, onClose }) {
   const [agents, setAgents] = useState([])
@@ -62,7 +63,7 @@ export function AgentListModal({ isOpen, onClose }) {
       {actionError && <div className="alert alert-error">{actionError}</div>}
 
       {loading ? (
-        <div className="modal-loading">Loading fleet listâ€¦</div>
+        <div className="modal-loading">Loading fleet list...</div>
       ) : agents.length === 0 ? (
         <p className="empty-state-notice">No agents currently available/online.</p>
       ) : (
@@ -70,10 +71,22 @@ export function AgentListModal({ isOpen, onClose }) {
           {agents.map((agent) => (
             <div key={agent.id} className="agent-row">
               <div className="agent-info">
-                <span className={`dot ${agent.available ? 'dot-online' : 'dot-offline'}`} title={agent.available ? 'Online' : 'Offline'} />
+                <span
+                  className={`dot ${agent.available ? 'dot-online' : 'dot-offline'}`}
+                  title={agent.available ? 'Online' : 'Offline'}
+                />
                 <div>
-                  <strong>{agent.name} {agent.available ? '' : '(Offline)'}</strong>
-                  <span className="agent-meta">{agent.email} {agent.phone ? `Â· ${agent.phone}` : ''}</span>
+                  <strong>
+                    {agent.name} {agent.available ? '' : '(Offline)'}
+                  </strong>
+                  <span className="agent-meta">
+                    {agent.email}
+                    {agent.phone && (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', marginLeft: '6px' }}>
+                        <IconPhone size={12} /> {agent.phone}
+                      </span>
+                    )}
+                  </span>
                 </div>
               </div>
               <button
