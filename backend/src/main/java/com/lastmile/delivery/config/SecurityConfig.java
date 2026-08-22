@@ -67,6 +67,17 @@ public class SecurityConfig {
                                                                 "/api/auth/reset-password")
                                                 .permitAll()
 
+                                                // Public zones & rate estimation for booking previews
+                                                .requestMatchers(
+                                                                HttpMethod.GET,
+                                                                "/api/zones")
+                                                .permitAll()
+
+                                                .requestMatchers(
+                                                                HttpMethod.POST,
+                                                                "/api/rates/estimate")
+                                                .permitAll()
+
                                                 // Temporary SMS testing endpoint
                                                 .requestMatchers(
                                                                 HttpMethod.POST,
@@ -106,7 +117,12 @@ public class SecurityConfig {
                 configuration.setAllowedOriginPatterns(
                                 List.of(
                                                 "http://localhost:*",
+                                                "http://127.0.0.1:*",
+                                                "http://10.*",
+                                                "http://192.168.*",
                                                 "https://*.vercel.app",
+                                                "https://*.ngrok-free.app",
+                                                "https://*.ngrok-free.dev",
                                                 allowedOrigin));
 
                 configuration.setAllowedMethods(
@@ -124,7 +140,8 @@ public class SecurityConfig {
                                                 "Content-Type",
                                                 "X-Requested-With",
                                                 "Accept",
-                                                "Origin"));
+                                                "Origin",
+                                                "ngrok-skip-browser-warning"));
 
                 configuration.setAllowCredentials(true);
 

@@ -1,4 +1,19 @@
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080'
+const getBaseUrl = () => {
+  const envUrl = import.meta.env.VITE_API_BASE_URL
+  if (envUrl && envUrl !== 'http://localhost:8080') {
+    return envUrl
+  }
+  // If loaded over public HTTPS (like Vercel) or remote mobile device, use the active public HTTPS backend tunnel
+  if (typeof window !== 'undefined' && window.location.protocol === 'https:') {
+    return 'https://acid-canola-cesarean.ngrok-free.dev'
+  }
+  if (typeof window !== 'undefined' && window.location.hostname && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return `http://${window.location.hostname}:8080`
+  }
+  return 'http://localhost:8080'
+}
+
+const BASE_URL = getBaseUrl()
 
 let authFailureHandler = null
 
@@ -26,6 +41,7 @@ export async function apiRequest(path, options = {}) {
 
   const headers = {
     'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...options.headers,
   }
