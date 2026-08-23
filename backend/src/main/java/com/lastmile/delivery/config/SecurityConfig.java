@@ -70,6 +70,20 @@ public class SecurityConfig {
                                 "/api/rates/estimate")
                         .permitAll()
 
+                        // Public Health & Uptime Check endpoints for UptimeRobot / Keep-alive monitors
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/",
+                                "/health",
+                                "/api/health")
+                        .permitAll()
+                        .requestMatchers(
+                                HttpMethod.HEAD,
+                                "/",
+                                "/health",
+                                "/api/health")
+                        .permitAll()
+
                         // SMS test endpoint
                         .requestMatchers(
                                 HttpMethod.POST,
