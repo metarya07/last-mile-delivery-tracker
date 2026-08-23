@@ -148,30 +148,11 @@ public class PasswordResetService {
                         User user,
                         String otp) {
 
-                String subject = "Password Reset OTP - Last Mile Delivery Tracker";
-
-                String message = """
-                                Hello %s,
-
-                                Your password reset OTP is: %s
-
-                                This OTP is valid for 10 minutes.
-
-                                If you did not request a password reset,
-                                please ignore this email.
-
-                                Regards,
-                                Last Mile Delivery Tracker
-                                """.formatted(
-                                user.getName(),
-                                otp);
-
                 try {
-
-                        emailService.sendEmail(
+                        emailService.sendPasswordResetOtpEmail(
                                         user.getEmail(),
-                                        subject,
-                                        message);
+                                        user.getName(),
+                                        otp);
 
                         System.out.println(
                                         "Password reset OTP email sent to "

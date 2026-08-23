@@ -482,12 +482,72 @@ public class OrderService {
         }
 
         OrderStatus status = order.getStatus();
-        String subject = "Order #" + order.getId() + " status update: " + status;
         String message = buildStatusMessage(order.getId(), status);
 
         if (customer.getEmail() != null && !customer.getEmail().isBlank()) {
             try {
-                emailService.sendEmail(customer.getEmail(), subject, message);
+                if (status == OrderStatus.PLACED) {
+                    emailService.sendOrderConfirmationEmail(
+                            customer.getEmail(),
+                            customer.getName(),
+                            order.getId(),
+                            order.getPickupAddress(),
+                            order.getDropAddress(),
+                            order.getOrderType() != null ? order.getOrderType().name() : "B2C",
+                            order.getFinalCharge());
+                } else {
+                    String subject = "🚚 Shipment Update: Order #" + order.getId() + " is " + status;
+                    String html = """
+                        <!DOCTYPE html>
+                        <html lang="en">
+                        <body style="margin: 0; padding: 0; background-color: #f4f7f6; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #112622;">
+                          <table border="0" cellpadding="0" cellspacing="0" width="100%%" style="padding: 30px 10px;">
+                            <tr>
+                              <td align="center">
+                                <table border="0" cellpadding="0" cellspacing="0" width="100%%" style="max-width: 560px; background-color: #ffffff; border: 1px solid #e2e8e5; border-radius: 12px; overflow: hidden;">
+                                  <tr>
+                                    <td align="center" style="background: #0f3d36; padding: 24px; text-align: center;">
+                                      <h2 style="margin: 0; color: #ffffff; font-size: 18px;">Delivery Status Update</h2>
+                                      <p style="margin: 4px 0 0; color: #d97706; font-size: 11px; font-weight: 700; text-transform: uppercase;">Order #%d • Status: %s</p>
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td style="padding: 28px 24px;">
+                                      <p style="margin: 0 0 14px; font-size: 14.5px;">Hello <strong>%s</strong>,</p>
+                                      <p style="margin: 0 0 20px; font-size: 14px; color: #526b65; line-height: 1.5;">%s</p>
+                                      
+                                      <div style="background: #f8faf9; border: 1px solid #e2e8e5; border-radius: 6px; padding: 14px; margin-bottom: 20px;">
+                                        <p style="margin: 0 0 6px; font-size: 12px; color: #526b65;"><strong>Pickup:</strong> %s</p>
+                                        <p style="margin: 0; font-size: 12px; color: #526b65;"><strong>Destination:</strong> %s</p>
+                                      </div>
+
+                                      <div style="text-align: center; margin-top: 20px;">
+                                        <a href="https://last-mile-delivery-11622.vercel.app" style="display: inline-block; background-color: #0f3d36; color: #ffffff; padding: 10px 20px; font-size: 13px; font-weight: 600; text-decoration: none; border-radius: 6px;">View Live Timeline</a>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                  <tr>
+                                    <td style="background-color: #f8faf9; border-top: 1px solid #edf2f0; padding: 14px 24px; text-align: center;">
+                                      <p style="margin: 0; font-size: 11px; color: #819b95;">© %d Last Mile Delivery Tracker.</p>
+                                    </td>
+                                  </tr>
+                                </table>
+                              </td>
+                            </tr>
+                          </table>
+                        </body>
+                        </html>
+                        """.formatted(
+                            order.getId(),
+                            status,
+                            customer.getName() != null ? customer.getName() : "Customer",
+                            message,
+                            order.getPickupAddress(),
+                            order.getDropAddress(),
+                            java.time.Year.now().getValue()
+                        );
+                    emailService.sendHtmlEmail(customer.getEmail(), subject, html);
+                }
             } catch (Exception ex) {
                 System.err.println("Email notification failed: " + ex.getMessage());
             }
