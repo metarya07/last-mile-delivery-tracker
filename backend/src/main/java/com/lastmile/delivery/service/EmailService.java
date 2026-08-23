@@ -1,15 +1,18 @@
 package com.lastmile.delivery.service;
 
 import java.math.BigDecimal;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
 
 import jakarta.mail.internet.MimeMessage;
 
@@ -20,60 +23,120 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
     private final String fromEmail;
+    private final String apiKey;
+    private final RestClient brevoRestClient;
 
     @Value("${spring.mail.username:}")
     private String smtpUsername;
 
     public EmailService(
-            JavaMailSender mailSender,
-            @Value("${app.mail.from:dispatch@lastmiledelivery.com}") String fromEmail) {
+            @Autowired(required = false) JavaMailSender mailSender,
+            @Value("${app.mail.from:metaryaspam@gmail.com}") String fromEmail,
+            @Value("${BREVO_API_KEY:none}") String apiKey) {
         this.mailSender = mailSender;
         this.fromEmail = fromEmail;
+        this.apiKey = apiKey;
+
+        this.brevoRestClient = RestClient.builder()
+                .baseUrl("https://api.brevo.com/v3")
+                .defaultHeader("api-key", apiKey != null ? apiKey : "")
+                .defaultHeader("accept", MediaType.APPLICATION_JSON_VALUE)
+                .build();
     }
 
     public void sendEmail(String recipient, String subject, String message) {
-        if (smtpUsername == null || smtpUsername.isBlank() || "none".equalsIgnoreCase(smtpUsername)) {
-            logger.warn("Brevo SMTP credentials not configured. Email notification skipped for: {}", recipient);
-            logger.info("Email Content Preview -> To: {} | Subject: {} | Content:\n{}", recipient, subject, message);
-            return;
+        // 1. Try Brevo HTTPS REST API first (Bypasses all cloud firewall/SMTP port blocks)
+        if (apiKey != null && !apiKey.isBlank() && !"none".equalsIgnoreCase(apiKey)) {
+            try {
+                Map<String, Object> payload = Map.of(
+                        "sender", Map.of("name", "Last Mile Delivery Tracker", "email", fromEmail),
+                        "to", List.of(Map.of("email", recipient)),
+                        "subject", subject,
+                        "textContent", message
+                );
+
+                brevoRestClient.post()
+                        .uri("/smtp/email")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(payload)
+                        .retrieve()
+                        .toBodilessEntity();
+
+                logger.info("Successfully dispatched email via Brevo REST API to {}", recipient);
+                return;
+            } catch (Exception ex) {
+                logger.warn("Brevo REST API email dispatch failed: {}. Attempting SMTP fallback...", ex.getMessage());
+            }
         }
 
-        try {
-            MimeMessage mimeMessage = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "utf-8");
+        // 2. Fallback to JavaMailSender (SMTP)
+        if (mailSender != null && smtpUsername != null && !smtpUsername.isBlank() && !"none".equalsIgnoreCase(smtpUsername)) {
+            try {
+                MimeMessage mimeMessage = mailSender.createMimeMessage();
+                MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, "utf-8");
 
-            helper.setFrom(fromEmail);
-            helper.setTo(recipient);
-            helper.setSubject(subject);
-            helper.setText(message, false);
+                helper.setFrom(fromEmail);
+                helper.setTo(recipient);
+                helper.setSubject(subject);
+                helper.setText(message, false);
 
-            mailSender.send(mimeMessage);
-            logger.info("Successfully dispatched plain text email notification to {}", recipient);
-        } catch (Exception e) {
-            logger.error("Failed to send email notification to {}: {}", recipient, e.getMessage(), e);
+                mailSender.send(mimeMessage);
+                logger.info("Successfully dispatched plain text email via SMTP to {}", recipient);
+                return;
+            } catch (Exception e) {
+                logger.error("Failed to send email via SMTP to {}: {}", recipient, e.getMessage());
+            }
         }
+
+        logger.warn("No active email provider configured (Set BREVO_API_KEY in Render). Email logged to console.");
+        logger.info("Email Content Preview -> To: {} | Subject: {} | Content:\n{}", recipient, subject, message);
     }
 
     public void sendHtmlEmail(String recipient, String subject, String htmlContent) {
-        if (smtpUsername == null || smtpUsername.isBlank() || "none".equalsIgnoreCase(smtpUsername)) {
-            logger.warn("Brevo SMTP credentials not configured. HTML email skipped for: {}", recipient);
-            return;
+        // 1. Try Brevo HTTPS REST API first (Bypasses all cloud firewall/SMTP port blocks)
+        if (apiKey != null && !apiKey.isBlank() && !"none".equalsIgnoreCase(apiKey)) {
+            try {
+                Map<String, Object> payload = Map.of(
+                        "sender", Map.of("name", "Last Mile Delivery Tracker", "email", fromEmail),
+                        "to", List.of(Map.of("email", recipient)),
+                        "subject", subject,
+                        "htmlContent", htmlContent
+                );
+
+                brevoRestClient.post()
+                        .uri("/smtp/email")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(payload)
+                        .retrieve()
+                        .toBodilessEntity();
+
+                logger.info("Successfully dispatched HTML email via Brevo REST API to {}", recipient);
+                return;
+            } catch (Exception ex) {
+                logger.warn("Brevo REST API HTML email failed: {}. Attempting SMTP fallback...", ex.getMessage());
+            }
         }
 
-        try {
-            MimeMessage mimeMessage = mailSender.createMimeMessage();
-            MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "utf-8");
+        // 2. Fallback to JavaMailSender (SMTP)
+        if (mailSender != null && smtpUsername != null && !smtpUsername.isBlank() && !"none".equalsIgnoreCase(smtpUsername)) {
+            try {
+                MimeMessage mimeMessage = mailSender.createMimeMessage();
+                MimeMessageHelper helper = new MimeMessageHelper(mimeMessage, true, "utf-8");
 
-            helper.setFrom(fromEmail);
-            helper.setTo(recipient);
-            helper.setSubject(subject);
-            helper.setText(htmlContent, true);
+                helper.setFrom(fromEmail);
+                helper.setTo(recipient);
+                helper.setSubject(subject);
+                helper.setText(htmlContent, true);
 
-            mailSender.send(mimeMessage);
-            logger.info("Successfully dispatched rich HTML email notification to {}", recipient);
-        } catch (Exception e) {
-            logger.error("Failed to send HTML email notification to {}: {}", recipient, e.getMessage(), e);
+                mailSender.send(mimeMessage);
+                logger.info("Successfully dispatched rich HTML email via SMTP to {}", recipient);
+                return;
+            } catch (Exception e) {
+                logger.error("Failed to send HTML email via SMTP to {}: {}", recipient, e.getMessage());
+            }
         }
+
+        logger.warn("No active email provider configured. HTML email logged to console.");
     }
 
     /**
