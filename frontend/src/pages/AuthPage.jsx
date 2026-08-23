@@ -149,6 +149,49 @@ export function AuthPage() {
             >
               {busy ? 'Signing in...' : 'Sign in'}
             </button>
+
+            <div className="demo-credentials-box" style={{ marginTop: '16px', padding: '12px', background: 'var(--primary-subtle)', borderRadius: '8px', border: '1px solid var(--primary-border)' }}>
+              <p style={{ fontSize: '11.5px', fontWeight: 700, textTransform: 'uppercase', color: 'var(--primary)', marginBottom: '8px', letterSpacing: '0.5px' }}>
+                🚀 Quick Role Preview (1-Click Sign-In)
+              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                <button
+                  type="button"
+                  onClick={() => { setLoginEmail('admin@lastmile.com'); setLoginPassword('password123') }}
+                  style={{ fontSize: '11.5px', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--primary-border)', background: '#ffffff', color: 'var(--text-main)', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  👑 Admin
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setLoginEmail('dispatcher@lastmile.com'); setLoginPassword('password123') }}
+                  style={{ fontSize: '11.5px', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--primary-border)', background: '#ffffff', color: 'var(--text-main)', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  📡 Dispatcher
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setLoginEmail('agent@lastmile.com'); setLoginPassword('password123') }}
+                  style={{ fontSize: '11.5px', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--primary-border)', background: '#ffffff', color: 'var(--text-main)', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  🚚 Driver
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setLoginEmail('warehouse@lastmile.com'); setLoginPassword('password123') }}
+                  style={{ fontSize: '11.5px', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--primary-border)', background: '#ffffff', color: 'var(--text-main)', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  📦 Warehouse
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setLoginEmail('customer@lastmile.com'); setLoginPassword('password123') }}
+                  style={{ fontSize: '11.5px', padding: '4px 8px', borderRadius: '4px', border: '1px solid var(--primary-border)', background: '#ffffff', color: 'var(--text-main)', cursor: 'pointer', fontWeight: 600 }}
+                >
+                  👤 Customer
+                </button>
+              </div>
+            </div>
           </form>
         ) : (
           <form onSubmit={handleRegister} className="modal-form">

@@ -1923,3 +1923,48 @@ textarea {
     width: 100%;
   }
 }
+
+/* ==========================================================
+   Demo Credentials Box & Quick Role Buttons
+   ========================================================== */
+.demo-credentials-box {
+  transition: all 0.2s ease;
+}
+
+.demo-credentials-box button {
+  transition: all 0.15s ease;
+}
+
+.demo-credentials-box button:hover {
+  background: var(--primary) !important;
+  color: #ffffff !important;
+  border-color: var(--primary) !important;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-xs);
+}
+
+.demo-credentials-box button:active {
+  transform: translateY(0);
+}
+
+/* ==========================================================
+   Live GPS & Proof of Delivery Card Styles
+   ========================================================== */
+.gps-live-box {
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+}
+
+.pod-box {
+  background: #f8faf9;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.modal-backdrop {
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+}
+
