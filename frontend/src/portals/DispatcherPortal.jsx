@@ -270,7 +270,7 @@ export function DispatcherPortal() {
   }
 
   return (
-    <div className="portal-shell">
+    <div className="shell portal-shell dispatcher-shell">
       {/* Mobile Topbar */}
       <header className="mobile-topbar">
         <button

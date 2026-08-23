@@ -132,7 +132,7 @@ export function WarehousePortal() {
   }
 
   return (
-    <div className="portal-shell">
+    <div className="shell portal-shell warehouse-shell">
       {/* Mobile Topbar */}
       <header className="mobile-topbar">
         <button

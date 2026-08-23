@@ -17,7 +17,7 @@ export function CreateOrderView({ onOrderCreated, isAdmin = false }) {
   const [targetCustomerId, setTargetCustomerId] = useState('')
 
   const [zones, setZones] = useState([])
-  const [estimate, setEstimate] = useState(null)
+  const [serverEstimate, setServerEstimate] = useState(null)
   const [estimating, setEstimating] = useState(false)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -34,22 +34,47 @@ export function CreateOrderView({ onOrderCreated, isAdmin = false }) {
     }).catch(() => {})
   }, [])
 
-  // Volumetric weight: (L * W * H) / 5000
+  // Volumetric weight: (L * W * H) / 5000 (with sanity caps: length/width/height 1-500cm, weight 0.05-1000kg)
+  const safeLength = useMemo(() => Math.min(Math.max(Number(lengthCm) || 0, 0), 500), [lengthCm])
+  const safeWidth = useMemo(() => Math.min(Math.max(Number(widthCm) || 0, 0), 500), [widthCm])
+  const safeHeight = useMemo(() => Math.min(Math.max(Number(heightCm) || 0, 0), 500), [heightCm])
+  const safeWeight = useMemo(() => Math.min(Math.max(Number(actualWeightKg) || 0, 0), 1000), [actualWeightKg])
+
   const estimatedVolumetricWeight = useMemo(() => {
-    const l = Number(lengthCm) || 0
-    const w = Number(widthCm) || 0
-    const h = Number(heightCm) || 0
-    if (l > 0 && w > 0 && h > 0) {
-      return ((l * w * h) / 5000).toFixed(3)
+    if (safeLength > 0 && safeWidth > 0 && safeHeight > 0) {
+      return ((safeLength * safeWidth * safeHeight) / 5000).toFixed(3)
     }
     return '0.000'
-  }, [lengthCm, widthCm, heightCm])
+  }, [safeLength, safeWidth, safeHeight])
 
   const estimatedChargeableWeight = useMemo(() => {
-    const act = Number(actualWeightKg) || 0
     const vol = Number(estimatedVolumetricWeight) || 0
-    return Math.max(act, vol).toFixed(3)
-  }, [actualWeightKg, estimatedVolumetricWeight])
+    return Math.max(safeWeight, vol).toFixed(3)
+  }, [safeWeight, estimatedVolumetricWeight])
+
+  // Instant local calculated estimate
+  const fallbackEstimate = useMemo(() => {
+    const chargeable = Math.max(Number(estimatedChargeableWeight) || 0.5, 0.1)
+    const isIntraZone = pickupZoneId === dropZoneId
+    const ratePerKg = orderType === 'B2B' ? (isIntraZone ? 30 : 45) : (isIntraZone ? 40 : 55)
+    const minCharge = orderType === 'B2B' ? (isIntraZone ? 70 : 100) : (isIntraZone ? 50 : 80)
+    const baseCharge = Math.max(chargeable * ratePerKg, minCharge)
+    const codSurcharge = paymentType === 'COD' ? (orderType === 'B2B' ? 40 : 25) : 0
+    const finalCharge = baseCharge + codSurcharge
+
+    return {
+      chargeableWeightKg: chargeable,
+      ratePerKg,
+      minimumCharge: minCharge,
+      baseCharge,
+      codSurcharge,
+      finalCharge,
+      orderType,
+      paymentType,
+    }
+  }, [estimatedChargeableWeight, pickupZoneId, dropZoneId, orderType, paymentType])
+
+  const estimate = serverEstimate || fallbackEstimate
 
   // Live pre-booking calculation estimate
   useEffect(() => {
@@ -61,23 +86,25 @@ export function CreateOrderView({ onOrderCreated, isAdmin = false }) {
         const est = await rateApi.estimateRate({
           pickupZoneId: Number(pickupZoneId),
           dropZoneId: Number(dropZoneId),
-          lengthCm: Number(lengthCm) || 10,
-          widthCm: Number(widthCm) || 10,
-          heightCm: Number(heightCm) || 10,
-          actualWeightKg: Number(actualWeightKg) || 0.5,
+          lengthCm: Number(safeLength) || 10,
+          widthCm: Number(safeWidth) || 10,
+          heightCm: Number(safeHeight) || 10,
+          actualWeightKg: Number(safeWeight) || 0.5,
           orderType,
           paymentType,
         })
-        setEstimate(est)
+        if (est && est.finalCharge) {
+          setServerEstimate(est)
+        }
       } catch {
-        setEstimate(null)
+        setServerEstimate(null)
       } finally {
         setEstimating(false)
       }
     }, 250)
 
     return () => clearTimeout(timer)
-  }, [pickupZoneId, dropZoneId, lengthCm, widthCm, heightCm, actualWeightKg, orderType, paymentType])
+  }, [pickupZoneId, dropZoneId, safeLength, safeWidth, safeHeight, safeWeight, orderType, paymentType])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -90,10 +117,10 @@ export function CreateOrderView({ onOrderCreated, isAdmin = false }) {
       dropAddress: dropAddress.trim(),
       pickupZoneId: Number(pickupZoneId),
       dropZoneId: Number(dropZoneId),
-      lengthCm: Number(lengthCm),
-      widthCm: Number(widthCm),
-      heightCm: Number(heightCm),
-      actualWeightKg: Number(actualWeightKg),
+      lengthCm: Number(safeLength) || 10,
+      widthCm: Number(safeWidth) || 10,
+      heightCm: Number(safeHeight) || 10,
+      actualWeightKg: Number(safeWeight) || 0.5,
       orderType,
       paymentType,
       ...(isAdmin && targetCustomerId ? { customerId: Number(targetCustomerId) } : {}),
@@ -120,23 +147,22 @@ export function CreateOrderView({ onOrderCreated, isAdmin = false }) {
     { id: 2, name: 'Zone 2 - South Zone' },
     { id: 3, name: 'Zone 3 - East Zone' },
     { id: 4, name: 'Zone 4 - West Zone' },
-    { id: 5, name: 'Zone 5 - Central Zone' },
   ]
 
   return (
-    <div className="panel create-order-panel">
+    <div className="panel" style={{ maxWidth: '800px', margin: '0 auto' }}>
       <div className="heading">
         <div>
-          <p className="eyebrow">DISPATCH DESK</p>
-          <h2>{isAdmin ? 'Create Order (On Behalf of Customer)' : 'Book a New Delivery'}</h2>
+          <span className="eyebrow">DISPATCH DESK</span>
+          <h2>Book a New Delivery</h2>
+          <p className="subtitle">Specify route locations, parcel dimensions, and billing options.</p>
         </div>
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
       {success && (
         <div className="alert alert-success">
-          <strong>Order #{success.id} created successfully!</strong> Total estimated charge:{' '}
-          <strong>{formatCurrency(success.finalCharge)}</strong>.
+          Order <strong>#{success.id}</strong> booked successfully! Base fare: {formatCurrency(success.baseCharge)}, Total: {formatCurrency(success.finalCharge)}
         </div>
       )}
 
@@ -216,7 +242,8 @@ export function CreateOrderView({ onOrderCreated, isAdmin = false }) {
               <input
                 type="number"
                 step="0.1"
-                min="0.1"
+                min="1"
+                max="500"
                 value={lengthCm}
                 onChange={(e) => setLengthCm(e.target.value)}
                 required
@@ -227,7 +254,8 @@ export function CreateOrderView({ onOrderCreated, isAdmin = false }) {
               <input
                 type="number"
                 step="0.1"
-                min="0.1"
+                min="1"
+                max="500"
                 value={widthCm}
                 onChange={(e) => setWidthCm(e.target.value)}
                 required
@@ -238,7 +266,8 @@ export function CreateOrderView({ onOrderCreated, isAdmin = false }) {
               <input
                 type="number"
                 step="0.1"
-                min="0.1"
+                min="1"
+                max="500"
                 value={heightCm}
                 onChange={(e) => setHeightCm(e.target.value)}
                 required
@@ -249,7 +278,8 @@ export function CreateOrderView({ onOrderCreated, isAdmin = false }) {
               <input
                 type="number"
                 step="0.01"
-                min="0.01"
+                min="0.05"
+                max="1000"
                 value={actualWeightKg}
                 onChange={(e) => setActualWeightKg(e.target.value)}
                 required

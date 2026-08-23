@@ -329,7 +329,7 @@ export function AdminPortal() {
   }
 
   return (
-    <div className="portal-shell">
+    <div className="shell portal-shell admin-shell">
       {/* Mobile Topbar */}
       <header className="mobile-topbar">
         <button

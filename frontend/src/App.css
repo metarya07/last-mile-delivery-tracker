@@ -142,8 +142,10 @@ p:last-child { margin-bottom: 0; }
 /* ==========================================================
    App Shell & Responsive Layout
    ========================================================== */
-.shell {
+.shell,
+.portal-shell {
   display: flex;
+  flex-direction: row;
   min-height: 100vh;
   width: 100%;
   position: relative;
