@@ -25,12 +25,17 @@ public class CustomUserDetailsService implements UserDetailsService {
                 .findByEmailIgnoreCase(email)
                 .orElseThrow(() -> new UsernameNotFoundException("Invalid credentials"));
 
+        java.util.List<SimpleGrantedAuthority> authorities = new java.util.ArrayList<>();
+        authorities.add(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()));
+
+        for (Permission permission : RbacConfig.getPermissions(user.getRole())) {
+            authorities.add(new SimpleGrantedAuthority("PERM_" + permission.name()));
+        }
+
         return org.springframework.security.core.userdetails.User
                 .withUsername(user.getEmail())
                 .password(user.getPassword())
-                .authorities(
-                        new SimpleGrantedAuthority(
-                                "ROLE_" + user.getRole().name()))
+                .authorities(authorities)
                 .build();
     }
 }

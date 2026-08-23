@@ -53,7 +53,7 @@ public class RateConfigController {
     }
 
     @PostMapping("/zones")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@rbac.hasPermission('ZONE_MANAGE')")
     @ResponseStatus(HttpStatus.CREATED)
     public ZoneResponse createZone(
             @Valid @RequestBody CreateZoneRequest request) {
@@ -62,7 +62,7 @@ public class RateConfigController {
     }
 
     @PostMapping("/zones/{id}/areas")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@rbac.hasPermission('ZONE_MANAGE')")
     @ResponseStatus(HttpStatus.CREATED)
     public ZoneAreaResponse addAreaToZone(
             @PathVariable Long id,
@@ -73,13 +73,13 @@ public class RateConfigController {
 
     // --- Rate Cards Management (B2B/B2C Intra & Inter-zone) ---
     @GetMapping("/rates")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@rbac.hasPermission('RATE_VIEW')")
     public List<RateCardResponse> getAllRateCards() {
         return rateConfigService.getAllRateCards();
     }
 
     @PostMapping("/rates")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@rbac.hasPermission('RATE_MANAGE')")
     public ResponseEntity<RateCardResponse> saveRateCard(
             @Valid @RequestBody RateCardRequest request) {
 
@@ -88,7 +88,7 @@ public class RateConfigController {
     }
 
     @PutMapping("/rates/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@rbac.hasPermission('RATE_MANAGE')")
     public RateCardResponse updateRateCard(
             @PathVariable Long id,
             @Valid @RequestBody RateCardRequest request) {
@@ -98,13 +98,13 @@ public class RateConfigController {
 
     // --- COD Surcharges Management ---
     @GetMapping("/rates/cod")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@rbac.hasPermission('RATE_VIEW')")
     public List<CodChargeResponse> getAllCodCharges() {
         return rateConfigService.getAllCodCharges();
     }
 
     @PutMapping("/rates/cod")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@rbac.hasPermission('RATE_MANAGE')")
     public CodChargeResponse saveCodCharge(
             @Valid @RequestBody CodChargeRequest request) {
 

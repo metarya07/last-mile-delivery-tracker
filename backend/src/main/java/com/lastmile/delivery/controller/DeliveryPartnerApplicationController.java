@@ -32,7 +32,7 @@ public class DeliveryPartnerApplicationController {
     }
 
     @PostMapping
-    @PreAuthorize("hasRole('CUSTOMER')")
+    @PreAuthorize("@rbac.hasPermission('PARTNER_APP_SUBMIT')")
     public ResponseEntity<DeliveryPartnerApplicationResponse> submitApplication(
             Authentication authentication,
             @Valid @RequestBody DeliveryPartnerApplicationRequest request) {
@@ -47,7 +47,7 @@ public class DeliveryPartnerApplicationController {
     }
 
     @GetMapping("/mine")
-    @PreAuthorize("hasRole('CUSTOMER')")
+    @PreAuthorize("@rbac.hasPermission('PARTNER_APP_VIEW_OWN')")
     public ResponseEntity<DeliveryPartnerApplicationResponse> getMyApplication(
             Authentication authentication) {
 
@@ -58,20 +58,20 @@ public class DeliveryPartnerApplicationController {
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@rbac.hasPermission('PARTNER_APP_VIEW_ALL')")
     public List<DeliveryPartnerApplicationResponse> getAllApplications() {
         return applicationService.getAllApplications();
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@rbac.canAccessApplication(#id)")
     public DeliveryPartnerApplicationResponse getApplication(
             @PathVariable Long id) {
         return applicationService.getApplication(id);
     }
 
     @PostMapping("/{id}/approve")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@rbac.hasPermission('PARTNER_APP_REVIEW')")
     public DeliveryPartnerApplicationResponse approveApplication(
             Authentication authentication,
             @PathVariable Long id) {
@@ -82,7 +82,7 @@ public class DeliveryPartnerApplicationController {
     }
 
     @PostMapping("/{id}/reject")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@rbac.hasPermission('PARTNER_APP_REVIEW')")
     public DeliveryPartnerApplicationResponse rejectApplication(
             Authentication authentication,
             @PathVariable Long id,

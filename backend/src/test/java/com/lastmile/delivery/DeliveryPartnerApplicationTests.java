@@ -251,13 +251,13 @@ class DeliveryPartnerApplicationTests {
         IllegalArgumentException ex1 = assertThrows(IllegalArgumentException.class, () -> {
             applicationService.approve(100L, "john@example.com");
         });
-        assertTrue(ex1.getMessage().contains("Only administrators can approve"));
+        assertTrue(ex1.getMessage().contains("Only administrators"));
 
         RejectApplicationRequest rejectRequest = new RejectApplicationRequest("No reason");
         IllegalArgumentException ex2 = assertThrows(IllegalArgumentException.class, () -> {
             applicationService.reject(100L, "john@example.com", rejectRequest);
         });
-        assertTrue(ex2.getMessage().contains("Only administrators can reject"));
+        assertTrue(ex2.getMessage().contains("Only administrators"));
     }
 
     @Test

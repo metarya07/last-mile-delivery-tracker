@@ -31,68 +31,64 @@ public class DashboardController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'DELIVERY_AGENT', 'CUSTOMER')")
-    public Map<String, Long> summary(
-            Authentication authentication) {
+    @PreAuthorize("isAuthenticated()")
+    public Map<String, Long> summary(Authentication authentication) {
         User user = userRepository
                 .findByEmailIgnoreCase(authentication.getName())
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
 
         return switch (user.getRole()) {
-            case ADMIN -> adminSummary();
+            case ADMIN, DISPATCHER -> adminSummary();
             case DELIVERY_AGENT -> deliveryAgentSummary(user.getId());
+            case WAREHOUSE_STAFF -> warehouseStaffSummary(user);
             case CUSTOMER -> customerSummary(user.getId());
         };
     }
 
     private Map<String, Long> adminSummary() {
         Map<String, Long> result = new LinkedHashMap<>();
-
-        result.put(
-                "total",
-                orderRepository.count());
+        result.put("total", orderRepository.count());
 
         for (OrderStatus status : OrderStatus.values()) {
-            result.put(
-                    status.name(),
-                    orderRepository.countByStatus(status));
+            result.put(status.name(), orderRepository.countByStatus(status));
         }
 
         return result;
     }
 
-    private Map<String, Long> deliveryAgentSummary(
-            Long agentId) {
-        List<DeliveryOrder> orders = orderRepository.findByDeliveryAgentIdOrderByUpdatedAtDesc(
-                agentId);
+    private Map<String, Long> warehouseStaffSummary(User staff) {
+        if (staff.getAssignedZone() == null) {
+            return adminSummary();
+        }
+
+        Long zoneId = staff.getAssignedZone().getId();
+        List<DeliveryOrder> orders = orderRepository.findAll().stream()
+                .filter(o -> (o.getPickupZone() != null && o.getPickupZone().getId().equals(zoneId))
+                        || (o.getDropZone() != null && o.getDropZone().getId().equals(zoneId)))
+                .toList();
 
         return createSummary(orders);
     }
 
-    private Map<String, Long> customerSummary(
-            Long customerId) {
-        List<DeliveryOrder> orders = orderRepository.findByCustomerIdOrderByCreatedAtDesc(
-                customerId);
-
+    private Map<String, Long> deliveryAgentSummary(Long agentId) {
+        List<DeliveryOrder> orders = orderRepository.findByDeliveryAgentIdOrderByUpdatedAtDesc(agentId);
         return createSummary(orders);
     }
 
-    private Map<String, Long> createSummary(
-            List<DeliveryOrder> orders) {
+    private Map<String, Long> customerSummary(Long customerId) {
+        List<DeliveryOrder> orders = orderRepository.findByCustomerIdOrderByCreatedAtDesc(customerId);
+        return createSummary(orders);
+    }
+
+    private Map<String, Long> createSummary(List<DeliveryOrder> orders) {
         Map<String, Long> result = new LinkedHashMap<>();
-
-        result.put(
-                "total",
-                (long) orders.size());
+        result.put("total", (long) orders.size());
 
         for (OrderStatus status : OrderStatus.values()) {
             long count = orders.stream()
                     .filter(order -> order.getStatus() == status)
                     .count();
-
-            result.put(
-                    status.name(),
-                    count);
+            result.put(status.name(), count);
         }
 
         return result;

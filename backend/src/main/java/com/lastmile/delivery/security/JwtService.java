@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import com.lastmile.delivery.entity.Role;
 
 @Service
 public class JwtService {
@@ -38,17 +39,40 @@ public class JwtService {
     public String generateToken(
             UserDetails user,
             String role) {
+        return generateToken(user, role, null);
+    }
+
+    public String generateToken(
+            UserDetails user,
+            String role,
+            Long userId) {
 
         Date issuedAt = new Date();
 
         Date expirationDate = Date.from(
                 Instant.now().plusMillis(expiration));
 
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .subject(user.getUsername())
                 .claim("role", role)
                 .issuedAt(issuedAt)
-                .expiration(expirationDate)
+                .expiration(expirationDate);
+
+        if (userId != null) {
+            builder.claim("userId", userId);
+        }
+
+        try {
+            Role userRole = Role.valueOf(role);
+            var permissions = RbacConfig.getPermissions(userRole)
+                    .stream()
+                    .map(Permission::name)
+                    .toList();
+            builder.claim("permissions", permissions);
+        } catch (Exception ignored) {
+        }
+
+        return builder
                 .signWith(signingKey)
                 .compact();
     }

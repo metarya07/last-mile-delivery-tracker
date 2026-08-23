@@ -1,7 +1,8 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { authApi } from '../api/authApi'
 import { setAuthFailureHandler } from '../api/client'
 import { AuthContext } from './authContextDef'
+import { hasPermission as checkPermission, hasRole as checkRole, ROLE_PERMISSIONS } from '../auth/permissions'
 
 const STORAGE_KEY = 'lmd-session'
 
@@ -66,22 +67,37 @@ export function AuthProvider({ children }) {
     }
   }
 
+  const user = useMemo(() => {
+    if (!session) return null
+    const role = session.role
+    const permissions = session.permissions || ROLE_PERMISSIONS[role] || []
+    return {
+      id: session.id,
+      name: session.name,
+      email: session.email,
+      role: session.role,
+      permissions,
+    }
+  }, [session])
+
+  const hasPerm = useCallback((permission) => checkPermission(user, permission), [user])
+  const checkUserRole = useCallback((...roles) => checkRole(user, ...roles), [user])
+
   const value = {
     session,
-    user: session
-      ? {
-          id: session.id,
-          name: session.name,
-          email: session.email,
-          role: session.role,
-        }
-      : null,
+    user,
     token: session?.token ?? null,
     isAuthenticated: !!session?.token,
     role: session?.role ?? null,
+    permissions: user?.permissions ?? [],
     isCustomer: session?.role === 'CUSTOMER',
     isAgent: session?.role === 'DELIVERY_AGENT',
     isAdmin: session?.role === 'ADMIN',
+    isDispatcher: session?.role === 'DISPATCHER',
+    isWarehouseStaff: session?.role === 'WAREHOUSE_STAFF',
+    hasPermission: hasPerm,
+    hasRole: checkUserRole,
+    hasAnyRole: checkUserRole,
     login,
     register,
     logout,

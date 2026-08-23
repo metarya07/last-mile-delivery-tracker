@@ -55,6 +55,10 @@ public class User {
     @Column(precision = 10, scale = 7)
     private BigDecimal longitude;
 
+    @jakarta.persistence.ManyToOne(fetch = jakarta.persistence.FetchType.LAZY)
+    @jakarta.persistence.JoinColumn(name = "assigned_zone_id")
+    private Zone assignedZone;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

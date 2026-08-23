@@ -15,6 +15,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.lastmile.delivery.dto.request.CreateOrderRequest;
+import com.lastmile.delivery.dto.request.LocationUpdateRequest;
+import com.lastmile.delivery.dto.request.ProofOfDeliveryRequest;
 import com.lastmile.delivery.dto.request.RescheduleOrderRequest;
 import com.lastmile.delivery.dto.request.StatusUpdateRequest;
 import com.lastmile.delivery.dto.response.DeliveryAttemptResponse;
@@ -35,7 +37,7 @@ public class OrderController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
+    @PreAuthorize("@rbac.hasPermission('ORDER_CREATE')")
     public ResponseEntity<OrderResponse> createOrder(
             Authentication authentication,
             @Valid @RequestBody CreateOrderRequest request) {
@@ -50,6 +52,7 @@ public class OrderController {
     }
 
     @GetMapping
+    @PreAuthorize("isAuthenticated()")
     public List<OrderResponse> getMyOrders(
             Authentication authentication) {
 
@@ -57,6 +60,7 @@ public class OrderController {
     }
 
     @GetMapping("/{id}")
+    @PreAuthorize("@rbac.canAccessOrder(#id)")
     public OrderResponse getOrder(
             Authentication authentication,
             @PathVariable Long id) {
@@ -67,7 +71,7 @@ public class OrderController {
     }
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasAnyRole('ADMIN', 'DELIVERY_AGENT')")
+    @PreAuthorize("@rbac.canUpdateOrderStatus(#id, #request.status())")
     public OrderResponse updateStatus(
             Authentication authentication,
             @PathVariable Long id,
@@ -80,7 +84,7 @@ public class OrderController {
     }
 
     @PostMapping("/{id}/assign/{agentId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@rbac.hasPermission('DELIVERY_ASSIGN')")
     public OrderResponse assignAgent(
             Authentication authentication,
             @PathVariable Long id,
@@ -93,7 +97,7 @@ public class OrderController {
     }
 
     @PostMapping("/{id}/auto-assign")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("@rbac.hasPermission('DELIVERY_AUTO_ASSIGN')")
     public OrderResponse autoAssignAgent(
             Authentication authentication,
             @PathVariable Long id) {
@@ -104,7 +108,7 @@ public class OrderController {
     }
 
     @PostMapping("/{id}/reschedule")
-    @PreAuthorize("hasAnyRole('CUSTOMER', 'ADMIN')")
+    @PreAuthorize("@rbac.canRescheduleOrder(#id)")
     public OrderResponse rescheduleOrder(
             Authentication authentication,
             @PathVariable Long id,
@@ -116,7 +120,34 @@ public class OrderController {
                 request != null ? request : new RescheduleOrderRequest(null, null));
     }
 
+    @PatchMapping("/{id}/location")
+    @PreAuthorize("@rbac.canUpdateLocation(#id)")
+    public OrderResponse updateLocation(
+            Authentication authentication,
+            @PathVariable Long id,
+            @Valid @RequestBody LocationUpdateRequest request) {
+
+        return orderService.updateLocation(
+                authentication.getName(),
+                id,
+                request);
+    }
+
+    @PostMapping("/{id}/proof-of-delivery")
+    @PreAuthorize("@rbac.canUploadPod(#id)")
+    public OrderResponse uploadProofOfDelivery(
+            Authentication authentication,
+            @PathVariable Long id,
+            @Valid @RequestBody ProofOfDeliveryRequest request) {
+
+        return orderService.uploadProofOfDelivery(
+                authentication.getName(),
+                id,
+                request);
+    }
+
     @GetMapping("/{id}/tracking")
+    @PreAuthorize("@rbac.canAccessOrder(#id)")
     public List<TrackingHistoryResponse> getTrackingHistory(
             Authentication authentication,
             @PathVariable Long id) {
@@ -127,6 +158,7 @@ public class OrderController {
     }
 
     @GetMapping("/{id}/attempts")
+    @PreAuthorize("@rbac.canAccessOrder(#id)")
     public List<DeliveryAttemptResponse> getDeliveryAttempts(
             Authentication authentication,
             @PathVariable Long id) {

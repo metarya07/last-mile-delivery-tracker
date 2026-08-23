@@ -2,7 +2,7 @@ import { apiRequest } from './client'
 
 export const orderApi = {
   /**
-   * Create a new order (CUSTOMER or ADMIN on behalf of customer)
+   * Create a new order (CUSTOMER or ADMIN/DISPATCHER on behalf of customer)
    * @param {Object} data
    * @param {string} data.pickupAddress
    * @param {string} data.dropAddress
@@ -26,7 +26,7 @@ export const orderApi = {
 
   /**
    * Get orders relevant to current authenticated user
-   * (CUSTOMER: own orders, DELIVERY_AGENT: assigned orders, ADMIN: all orders)
+   * (CUSTOMER: own orders, DELIVERY_AGENT: assigned orders, WAREHOUSE_STAFF: zone orders, ADMIN/DISPATCHER: all orders)
    * @returns {Promise<Array<Object>>}
    */
   async getMyOrders() {
@@ -47,7 +47,7 @@ export const orderApi = {
   },
 
   /**
-   * Update order status (ADMIN or assigned DELIVERY_AGENT)
+   * Update order status (ADMIN/DISPATCHER or assigned DELIVERY_AGENT or WAREHOUSE_STAFF)
    * @param {number|string} id
    * @param {Object} payload
    * @param {string} payload.status
@@ -66,7 +66,33 @@ export const orderApi = {
   },
 
   /**
-   * Assign delivery agent to order (ADMIN only)
+   * Update live GPS location for an order (DELIVERY_AGENT only)
+   * @param {number|string} orderId
+   * @param {{ latitude: number, longitude: number }} location
+   * @returns {Promise<Object>}
+   */
+  async updateLocation(orderId, location) {
+    return apiRequest(`/api/orders/${orderId}/location`, {
+      method: 'PATCH',
+      body: JSON.stringify(location),
+    })
+  },
+
+  /**
+   * Upload Proof of Delivery (DELIVERY_AGENT only)
+   * @param {number|string} orderId
+   * @param {{ podUrl: string, signatureUrl?: string, recipientName?: string, notes?: string }} podData
+   * @returns {Promise<Object>}
+   */
+  async uploadProofOfDelivery(orderId, podData) {
+    return apiRequest(`/api/orders/${orderId}/proof-of-delivery`, {
+      method: 'POST',
+      body: JSON.stringify(podData),
+    })
+  },
+
+  /**
+   * Assign delivery agent to order (ADMIN or DISPATCHER)
    * @param {number|string} orderId
    * @param {number|string} agentId
    * @returns {Promise<Object>}
@@ -78,7 +104,7 @@ export const orderApi = {
   },
 
   /**
-   * Automatically detect and assign nearest/best available delivery agent (ADMIN only)
+   * Automatically detect and assign nearest/best available delivery agent (ADMIN or DISPATCHER)
    * @param {number|string} orderId
    * @returns {Promise<Object>}
    */
@@ -89,7 +115,7 @@ export const orderApi = {
   },
 
   /**
-   * Reschedule a failed order for a new delivery attempt (CUSTOMER or ADMIN)
+   * Reschedule a failed order for a new delivery attempt (CUSTOMER or ADMIN/DISPATCHER)
    * @param {number|string} orderId
    * @param {Object} [payload]
    * @param {string} [payload.rescheduledDate]

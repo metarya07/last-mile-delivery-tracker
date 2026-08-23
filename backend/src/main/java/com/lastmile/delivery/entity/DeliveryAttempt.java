@@ -51,6 +51,18 @@ public class DeliveryAttempt {
     @Column(name = "failure_reason", length = 500)
     private String failureReason;
 
+    @Column(name = "pod_url", length = 500)
+    private String podUrl;
+
+    @Column(name = "pod_signature", length = 500)
+    private String podSignature;
+
+    @Column(name = "pod_notes", length = 500)
+    private String podNotes;
+
+    @Column(name = "recipient_name", length = 150)
+    private String recipientName;
+
     @Column(name = "attempted_at", nullable = false, updatable = false)
     private Instant attemptedAt;
 

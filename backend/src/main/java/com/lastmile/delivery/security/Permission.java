@@ -1,0 +1,55 @@
+package com.lastmile.delivery.security;
+
+public enum Permission {
+    // User Management
+    USER_VIEW_ALL,
+    USER_MANAGE_ROLES,
+    USER_DELETE,
+    USER_VIEW_AGENTS,
+    USER_UPDATE_OWN_AVAILABILITY,
+    USER_VIEW_OWN_PROFILE,
+    USER_UPDATE_OWN_PROFILE,
+
+    // Order Management
+    ORDER_VIEW_ALL,
+    ORDER_VIEW_ASSIGNED,
+    ORDER_VIEW_WAREHOUSE,
+    ORDER_VIEW_OWN,
+    ORDER_CREATE,
+    ORDER_CREATE_ON_BEHALF,
+    ORDER_RESCHEDULE,
+
+    // Delivery & Dispatch Operations
+    DELIVERY_VIEW_ALL,
+    DELIVERY_VIEW_ASSIGNED,
+    DELIVERY_ASSIGN,
+    DELIVERY_REASSIGN,
+    DELIVERY_AUTO_ASSIGN,
+    DELIVERY_STATUS_UPDATE,
+    DELIVERY_LOCATION_UPDATE,
+    PROOF_OF_DELIVERY_UPLOAD,
+
+    // Warehouse & Hub Management
+    WAREHOUSE_VIEW,
+    WAREHOUSE_MANAGE,
+    PACKAGE_PROCESS,
+    PACKAGE_HANDOVER,
+
+    // Pricing & Coverage Zones
+    ZONE_VIEW,
+    ZONE_MANAGE,
+    RATE_VIEW,
+    RATE_MANAGE,
+
+    // Partner Applications
+    PARTNER_APP_SUBMIT,
+    PARTNER_APP_VIEW_OWN,
+    PARTNER_APP_VIEW_ALL,
+    PARTNER_APP_REVIEW,
+
+    // Reports & System Configuration
+    REPORT_VIEW_OPERATIONAL,
+    REPORT_VIEW_ALL,
+    AUDIT_LOG_VIEW,
+    SYSTEM_SETTINGS_MANAGE
+}

@@ -89,10 +89,10 @@ public class DeliveryPartnerApplicationService {
         return mapToResponse(application);
     }
 
-    public DeliveryPartnerApplicationResponse approve(Long id, String adminEmail) {
-        User reviewer = findUser(adminEmail);
-        if (reviewer.getRole() != Role.ADMIN) {
-            throw new IllegalArgumentException("Only administrators can approve applications");
+    public DeliveryPartnerApplicationResponse approve(Long id, String reviewerEmail) {
+        User reviewer = findUser(reviewerEmail);
+        if (reviewer.getRole() != Role.ADMIN && reviewer.getRole() != Role.DISPATCHER) {
+            throw new IllegalArgumentException("Only administrators and operations managers can approve applications");
         }
 
         DeliveryPartnerApplication application = applicationRepository.findById(id)
@@ -123,12 +123,12 @@ public class DeliveryPartnerApplicationService {
 
     public DeliveryPartnerApplicationResponse reject(
             Long id,
-            String adminEmail,
+            String reviewerEmail,
             RejectApplicationRequest request) {
 
-        User reviewer = findUser(adminEmail);
-        if (reviewer.getRole() != Role.ADMIN) {
-            throw new IllegalArgumentException("Only administrators can reject applications");
+        User reviewer = findUser(reviewerEmail);
+        if (reviewer.getRole() != Role.ADMIN && reviewer.getRole() != Role.DISPATCHER) {
+            throw new IllegalArgumentException("Only administrators and operations managers can reject applications");
         }
 
         DeliveryPartnerApplication application = applicationRepository.findById(id)

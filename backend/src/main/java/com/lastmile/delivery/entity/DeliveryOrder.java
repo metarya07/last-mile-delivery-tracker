@@ -94,6 +94,15 @@ public class DeliveryOrder {
     @Column(nullable = false)
     private OrderStatus status;
 
+    @Column(name = "current_latitude", precision = 10, scale = 7)
+    private BigDecimal currentLatitude;
+
+    @Column(name = "current_longitude", precision = 10, scale = 7)
+    private BigDecimal currentLongitude;
+
+    @Column(name = "pod_url", length = 500)
+    private String podUrl;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 

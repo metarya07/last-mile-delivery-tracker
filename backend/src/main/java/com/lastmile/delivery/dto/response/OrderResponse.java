@@ -20,5 +20,26 @@ public record OrderResponse(
         OrderStatus status,
         BigDecimal chargeableWeightKg,
         BigDecimal finalCharge,
-        Instant createdAt) {
+        Instant createdAt,
+        BigDecimal currentLatitude,
+        BigDecimal currentLongitude,
+        String podUrl) {
+
+    public OrderResponse(
+            Long id,
+            Long customerId,
+            Long deliveryAgentId,
+            String pickupAddress,
+            String dropAddress,
+            String pickupZone,
+            String dropZone,
+            OrderType orderType,
+            PaymentType paymentType,
+            OrderStatus status,
+            BigDecimal chargeableWeightKg,
+            BigDecimal finalCharge,
+            Instant createdAt) {
+        this(id, customerId, deliveryAgentId, pickupAddress, dropAddress, pickupZone, dropZone,
+                orderType, paymentType, status, chargeableWeightKg, finalCharge, createdAt, null, null, null);
+    }
 }

@@ -122,21 +122,32 @@ public class AuthService {
         }
 
         private AuthResponse createResponse(User user) {
+                java.util.List<org.springframework.security.core.authority.SimpleGrantedAuthority> authorities = new java.util.ArrayList<>();
+                authorities.add(new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_" + user.getRole().name()));
+
+                java.util.Set<String> permissionNames = new java.util.HashSet<>();
+                for (com.lastmile.delivery.security.Permission permission : com.lastmile.delivery.security.RbacConfig.getPermissions(user.getRole())) {
+                        authorities.add(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERM_" + permission.name()));
+                        permissionNames.add(permission.name());
+                }
+
                 UserDetails userDetails = org.springframework.security.core.userdetails.User
                                 .withUsername(user.getEmail())
                                 .password(user.getPassword())
-                                .authorities("ROLE_" + user.getRole().name())
+                                .authorities(authorities)
                                 .build();
 
                 String token = jwtService.generateToken(
                                 userDetails,
-                                user.getRole().name());
+                                user.getRole().name(),
+                                user.getId());
 
                 return new AuthResponse(
                                 token,
                                 user.getId(),
                                 user.getName(),
                                 user.getEmail(),
-                                user.getRole());
+                                user.getRole(),
+                                permissionNames);
         }
 }

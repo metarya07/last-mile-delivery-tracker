@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../context/useAuth'
 import { orderApi } from '../api/orderApi'
 import { userApi } from '../api/userApi'
+import { auditApi } from '../api/auditApi'
 import { dashboardApi } from '../api/dashboardApi'
 import { MetricCard } from '../components/common/MetricCard'
 import { StatusBadge } from '../components/common/StatusBadge'
@@ -34,16 +35,26 @@ import { formatCurrency, formatShortDate } from '../utils/formatters'
 
 export function AdminPortal() {
   const { user, logout } = useAuth()
-  const [currentTab, setCurrentTab] = useState('dashboard') // 'dashboard' | 'orders' | 'assignments' | 'rates' | 'agents' | 'applications' | 'tracking'
+  const [currentTab, setCurrentTab] = useState('dashboard') // 'dashboard' | 'orders' | 'assignments' | 'rates' | 'agents' | 'applications' | 'tracking' | 'users' | 'audit'
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
 
   const [orders, setOrders] = useState([])
   const [agents, setAgents] = useState([])
   const [applications, setApplications] = useState([])
+  const [allUsers, setAllUsers] = useState([])
+  const [auditLogs, setAuditLogs] = useState([])
   const [summary, setSummary] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [refreshIndex, setRefreshIndex] = useState(0)
+
+  // Users and Audit state
+  const [userSearchQuery, setUserSearchQuery] = useState('')
+  const [userRoleFilter, setUserRoleFilter] = useState('ALL')
+  const [roleUpdatingId, setRoleUpdatingId] = useState(null)
+  const [userActionSuccess, setUserActionSuccess] = useState('')
+  const [userActionError, setUserActionError] = useState('')
+  const [auditSearchQuery, setAuditSearchQuery] = useState('')
 
   // Applications tab specific state
   const [appStatusFilter, setAppStatusFilter] = useState('ALL')
@@ -84,11 +95,13 @@ export function AdminPortal() {
 
     const fetchData = async () => {
       try {
-        const [ordersData, agentsData, appsData, summaryData] = await Promise.all([
+        const [ordersData, agentsData, appsData, summaryData, usersData, auditData] = await Promise.all([
           orderApi.getMyOrders(),
           userApi.getDeliveryAgents().catch(() => []),
           deliveryPartnerApplicationApi.getAllApplications().catch(() => []),
           dashboardApi.getSummary().catch(() => ({})),
+          userApi.getAllUsers().catch(() => []),
+          auditApi.getRecentAuditLogs().catch(() => []),
         ])
 
         if (isMounted) {
@@ -96,6 +109,8 @@ export function AdminPortal() {
           setAgents(agentsData || [])
           setApplications(appsData || [])
           setSummary(summaryData || {})
+          setAllUsers(usersData || [])
+          setAuditLogs(auditData || [])
           setError('')
         }
       } catch (err) {
@@ -119,6 +134,36 @@ export function AdminPortal() {
   const handleRefresh = () => {
     setLoading(true)
     setRefreshIndex((prev) => prev + 1)
+  }
+
+  const handleUpdateUserRole = async (userId, newRole) => {
+    setRoleUpdatingId(userId)
+    setUserActionError('')
+    setUserActionSuccess('')
+    try {
+      const updatedUser = await userApi.updateUserRole(userId, { role: newRole })
+      setAllUsers((prev) => prev.map((u) => (u.id === userId ? { ...u, role: updatedUser.role } : u)))
+      setUserActionSuccess(`Role for ${updatedUser.name} updated to ${updatedUser.role}.`)
+      setRefreshIndex((prev) => prev + 1)
+    } catch (err) {
+      setUserActionError(err.message || 'Failed to update user role.')
+    } finally {
+      setRoleUpdatingId(null)
+    }
+  }
+
+  const handleDeleteUser = async (userId) => {
+    if (!window.confirm(`Are you sure you want to delete user #${userId}?`)) return
+    setUserActionError('')
+    setUserActionSuccess('')
+    try {
+      await userApi.deleteUser(userId)
+      setAllUsers((prev) => prev.filter((u) => u.id !== userId))
+      setUserActionSuccess(`User #${userId} deleted successfully.`)
+      setRefreshIndex((prev) => prev + 1)
+    } catch (err) {
+      setUserActionError(err.message || 'Failed to delete user.')
+    }
   }
 
   const handleOrderUpdated = (updatedOrder) => {
@@ -383,7 +428,27 @@ export function AdminPortal() {
               onClick={() => switchTab('tracking')}
             >
               <IconSearch size={16} />
-              <span>Tracking & Audit</span>
+              <span>Tracking History</span>
+            </button>
+            <button
+              type="button"
+              className={`nav-link-btn ${currentTab === 'users' ? 'active' : ''}`}
+              onClick={() => {
+                switchTab('users')
+                setUserActionError('')
+                setUserActionSuccess('')
+              }}
+            >
+              <IconUser size={16} />
+              <span>User Roles ({allUsers.length})</span>
+            </button>
+            <button
+              type="button"
+              className={`nav-link-btn ${currentTab === 'audit' ? 'active' : ''}`}
+              onClick={() => switchTab('audit')}
+            >
+              <IconAlert size={16} />
+              <span>Security Audit Trail</span>
             </button>
           </div>
         </nav>
@@ -1132,6 +1197,186 @@ export function AdminPortal() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* TAB 8: USER ROLES & ACCESS CONTROL */}
+        {currentTab === 'users' && (
+          <div className="dashboard-content">
+            <div className="section-toolbar">
+              <div>
+                <h2>User Roles & Access Control (RBAC)</h2>
+                <p className="subtitle">Manage user permissions, assign system roles, and govern facility access.</p>
+              </div>
+            </div>
+
+            {userActionSuccess && <div className="alert alert-success">{userActionSuccess}</div>}
+            {userActionError && <div className="alert alert-error">{userActionError}</div>}
+
+            <div className="filter-bar">
+              <input
+                type="text"
+                placeholder="Search users by name, email, or ID..."
+                value={userSearchQuery}
+                onChange={(e) => setUserSearchQuery(e.target.value)}
+                className="search-input"
+              />
+              <select
+                value={userRoleFilter}
+                onChange={(e) => setUserRoleFilter(e.target.value)}
+                className="filter-select"
+              >
+                <option value="ALL">All Roles</option>
+                <option value="ADMIN">Admin</option>
+                <option value="DISPATCHER">Dispatcher</option>
+                <option value="DELIVERY_AGENT">Delivery Agent</option>
+                <option value="WAREHOUSE_STAFF">Warehouse Staff</option>
+                <option value="CUSTOMER">Customer</option>
+              </select>
+            </div>
+
+            <section className="panel">
+              <div className="orders-table-wrapper">
+                <table className="orders-table">
+                  <thead>
+                    <tr>
+                      <th>User ID</th>
+                      <th>Full Name</th>
+                      <th>Email Address</th>
+                      <th>Assigned Role</th>
+                      <th>Change Role</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allUsers
+                      .filter((u) => {
+                        const matchRole = userRoleFilter === 'ALL' || u.role === userRoleFilter
+                        const query = userSearchQuery.trim().toLowerCase()
+                        const matchQuery =
+                          !query ||
+                          u.id?.toString().includes(query) ||
+                          u.name?.toLowerCase().includes(query) ||
+                          u.email?.toLowerCase().includes(query)
+                        return matchRole && matchQuery
+                      })
+                      .map((u) => (
+                        <tr key={u.id}>
+                          <td><strong>#{u.id}</strong></td>
+                          <td><strong>{u.name}</strong></td>
+                          <td>{u.email}</td>
+                          <td>
+                            <span className={u.role === 'ADMIN' ? 'badge-agent-assigned' : u.role === 'DISPATCHER' ? 'badge-agent-assigned' : 'badge-meta'}>
+                              {u.role}
+                            </span>
+                          </td>
+                          <td>
+                            <select
+                              value={u.role}
+                              onChange={(e) => handleUpdateUserRole(u.id, e.target.value)}
+                              disabled={roleUpdatingId === u.id || u.id === user?.id}
+                              className="filter-select"
+                              style={{ padding: '4px 8px', fontSize: '13px' }}
+                            >
+                              <option value="CUSTOMER">CUSTOMER</option>
+                              <option value="DELIVERY_AGENT">DELIVERY_AGENT</option>
+                              <option value="WAREHOUSE_STAFF">WAREHOUSE_STAFF</option>
+                              <option value="DISPATCHER">DISPATCHER</option>
+                              <option value="ADMIN">ADMIN</option>
+                            </select>
+                          </td>
+                          <td>
+                            <button
+                              type="button"
+                              className="btn-table-action"
+                              style={{ color: '#dc2626', borderColor: '#fca5a5' }}
+                              onClick={() => handleDeleteUser(u.id)}
+                              disabled={u.id === user?.id}
+                            >
+                              Delete
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {/* TAB 9: SECURITY AUDIT TRAIL */}
+        {currentTab === 'audit' && (
+          <div className="dashboard-content">
+            <div className="section-toolbar">
+              <div>
+                <h2>Enterprise Security Audit Trail</h2>
+                <p className="subtitle">Immutable chronological log of authentication, authorization, and data mutation events.</p>
+              </div>
+            </div>
+
+            <div className="filter-bar">
+              <input
+                type="text"
+                placeholder="Search audit records by actor email, action, resource, or details..."
+                value={auditSearchQuery}
+                onChange={(e) => setAuditSearchQuery(e.target.value)}
+                className="search-input"
+              />
+            </div>
+
+            <section className="panel">
+              {auditLogs.length === 0 ? (
+                <div className="empty-state">
+                  <p>No audit log events recorded yet.</p>
+                </div>
+              ) : (
+                <div className="orders-table-wrapper">
+                  <table className="orders-table">
+                    <thead>
+                      <tr>
+                        <th>Timestamp</th>
+                        <th>Actor</th>
+                        <th>Role</th>
+                        <th>Security Action</th>
+                        <th>Resource</th>
+                        <th>Status</th>
+                        <th>Event Details</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {auditLogs
+                        .filter((log) => {
+                          const query = auditSearchQuery.trim().toLowerCase()
+                          if (!query) return true
+                          return (
+                            log.userEmail?.toLowerCase().includes(query) ||
+                            log.action?.toLowerCase().includes(query) ||
+                            log.resourceType?.toLowerCase().includes(query) ||
+                            log.resourceId?.toLowerCase().includes(query) ||
+                            log.details?.toLowerCase().includes(query)
+                          )
+                        })
+                        .map((log) => (
+                          <tr key={log.id}>
+                            <td><span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>{formatShortDate(log.timestamp)}</span></td>
+                            <td><strong>{log.userEmail || `User #${log.userId}`}</strong></td>
+                            <td><code>{log.userRole || 'N/A'}</code></td>
+                            <td><strong>{log.action}</strong></td>
+                            <td><span>{log.resourceType} {log.resourceId ? `#${log.resourceId}` : ''}</span></td>
+                            <td>
+                              <span className={log.status === 'SUCCESS' ? 'badge-agent-assigned' : 'badge-meta'} style={log.status !== 'SUCCESS' ? { background: '#fee2e2', color: '#991b1b' } : {}}>
+                                {log.status}
+                              </span>
+                            </td>
+                            <td><span style={{ fontSize: '12px' }}>{log.details}</span></td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </section>
           </div>
         )}
       </main>

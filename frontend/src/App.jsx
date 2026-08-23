@@ -4,6 +4,8 @@ import { AuthPage } from './pages/AuthPage'
 import { CustomerPortal } from './portals/CustomerPortal'
 import { DeliveryPartnerPortal } from './portals/DeliveryPartnerPortal'
 import { AdminPortal } from './portals/AdminPortal'
+import { DispatcherPortal } from './portals/DispatcherPortal'
+import { WarehousePortal } from './portals/WarehousePortal'
 import './App.css'
 
 function AppContent() {
@@ -19,10 +21,13 @@ function AppContent() {
       return <CustomerPortal />
     case 'DELIVERY_AGENT':
       return <DeliveryPartnerPortal />
+    case 'WAREHOUSE_STAFF':
+      return <WarehousePortal />
+    case 'DISPATCHER':
+      return <DispatcherPortal />
     case 'ADMIN':
       return <AdminPortal />
     default:
-      // Fallback for unrecognized role
       return <CustomerPortal />
   }
 }
