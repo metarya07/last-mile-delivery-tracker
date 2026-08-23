@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo } from 'react'
 import { useAuth } from '../context/useAuth'
 import { orderApi } from '../api/orderApi'
 import { userApi } from '../api/userApi'
-import { dashboardApi } from '../api/dashboardApi'
 import { MetricCard } from '../components/common/MetricCard'
 import { StatusBadge } from '../components/common/StatusBadge'
 import { OrderDetailModal } from '../components/tracking/OrderDetailModal'
@@ -13,10 +12,8 @@ import {
   IconCheck,
   IconRefresh,
   IconMenu,
-  IconAlert,
-  IconSearch,
 } from '../components/common/Icons'
-import { formatCurrency, formatShortDate } from '../utils/formatters'
+import { formatShortDate } from '../utils/formatters'
 
 export function WarehousePortal() {
   const { user, logout } = useAuth()
@@ -25,7 +22,6 @@ export function WarehousePortal() {
 
   const [orders, setOrders] = useState([])
   const [agents, setAgents] = useState([])
-  const [summary, setSummary] = useState({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [refreshIndex, setRefreshIndex] = useState(0)
@@ -43,16 +39,14 @@ export function WarehousePortal() {
 
     const fetchData = async () => {
       try {
-        const [ordersData, agentsData, summaryData] = await Promise.all([
+        const [ordersData, agentsData] = await Promise.all([
           orderApi.getMyOrders(),
           userApi.getDeliveryAgents().catch(() => []),
-          dashboardApi.getSummary().catch(() => ({})),
         ])
 
         if (isMounted) {
           setOrders(ordersData || [])
           setAgents(agentsData || [])
-          setSummary(summaryData || {})
           setError('')
         }
       } catch (err) {
@@ -92,6 +86,12 @@ export function WarehousePortal() {
     } finally {
       setActionBusyId(null)
     }
+  }
+
+  const getAgentLabel = (agentId) => {
+    if (!agentId) return null
+    const found = agents.find((a) => a.id === agentId)
+    return found ? `${found.name} (#${found.id})` : `Agent #${agentId}`
   }
 
   // Incoming / Intake packages queue (PLACED)
@@ -330,7 +330,7 @@ export function WarehousePortal() {
                           <td><StatusBadge status={order.status} /></td>
                           <td>
                             {order.deliveryAgentId ? (
-                              <span className="badge-agent-assigned">Agent #{order.deliveryAgentId}</span>
+                              <span className="badge-agent-assigned">{getAgentLabel(order.deliveryAgentId)}</span>
                             ) : (
                               <span className="badge-agent-unassigned">Unassigned</span>
                             )}
@@ -476,7 +476,7 @@ export function WarehousePortal() {
                           </td>
                           <td>
                             {order.deliveryAgentId ? (
-                              <span className="badge-agent-assigned">Agent #{order.deliveryAgentId}</span>
+                              <span className="badge-agent-assigned">{getAgentLabel(order.deliveryAgentId)}</span>
                             ) : (
                               <span className="badge-agent-unassigned">Awaiting Allocation</span>
                             )}

@@ -555,6 +555,32 @@ export function DispatcherPortal() {
                 <option value="FAILED">Failed</option>
                 <option value="RESCHEDULED">Rescheduled</option>
               </select>
+              <select
+                value={agentFilter}
+                onChange={(e) => setAgentFilter(e.target.value)}
+                className="filter-select"
+              >
+                <option value="ALL">All Drivers</option>
+                <option value="UNASSIGNED">Unassigned Only</option>
+                <option value="ASSIGNED">Assigned Only</option>
+                {agents.map((ag) => (
+                  <option key={ag.id} value={ag.id.toString()}>
+                    Agent #{ag.id} - {ag.name}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={zoneFilter}
+                onChange={(e) => setZoneFilter(e.target.value)}
+                className="filter-select"
+              >
+                <option value="ALL">All Zones</option>
+                {uniqueZones.map((z) => (
+                  <option key={z} value={z}>
+                    {z}
+                  </option>
+                ))}
+              </select>
             </div>
 
             <section className="panel">
@@ -760,6 +786,26 @@ export function DispatcherPortal() {
 
             {appActionSuccess && <div className="alert alert-success">{appActionSuccess}</div>}
             {appActionError && <div className="alert alert-error">{appActionError}</div>}
+
+            <div className="filter-bar">
+              <input
+                type="text"
+                placeholder="Search by Applicant Name, Email, Phone, Vehicle, License..."
+                value={appSearchQuery}
+                onChange={(e) => setAppSearchQuery(e.target.value)}
+                className="search-input"
+              />
+              <select
+                value={appStatusFilter}
+                onChange={(e) => setAppStatusFilter(e.target.value)}
+                className="filter-select"
+              >
+                <option value="ALL">All Application Statuses</option>
+                <option value="PENDING">Pending Review</option>
+                <option value="APPROVED">Approved</option>
+                <option value="REJECTED">Rejected</option>
+              </select>
+            </div>
 
             <section className="panel">
               {filteredApplications.length === 0 ? (
