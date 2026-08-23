@@ -1,45 +1,61 @@
 # 📦 Last-Mile Delivery Tracker
 
-A full-stack, enterprise-grade logistics and delivery management platform. Built to support dynamic parcel pricing engines, intelligent driver assignment, real-time tracking with immutable audit trails, multi-role portal experiences, customer delivery rescheduling, and partner verification workflows.
+A full-stack, enterprise-grade logistics and delivery management platform. Built to support dynamic parcel pricing engines, intelligent driver auto-assignment, real-time tracking with immutable audit trails, multi-role portal experiences (Admin, Dispatcher, Delivery Agent, Warehouse, Customer), failed delivery recovery, and Brevo transactional notifications.
 
 ---
 
-## 🌐 Hosted Deployment
+## 🌐 Live Hosted Deployments & Links
 
-- **Frontend Application (Vercel)**: [https://last-mile-delivery-frontend.vercel.app](https://last-mile-delivery-frontend.vercel.app)
-- **Repository**: [https://github.com/metarya07/last-mile-delivery-tracker](https://github.com/metarya07/last-mile-delivery-tracker)
+| Service | URL |
+|---|---|
+| **Frontend Application (Vercel)** | [https://last-mile-delivery-11622.vercel.app](https://last-mile-delivery-11622.vercel.app) |
+| **Backend API (Render)** | [https://last-mile-delivery-tracker-ahmz.onrender.com](https://last-mile-delivery-tracker-ahmz.onrender.com) |
+| **GitHub Repository** | [https://github.com/metarya07/last-mile-delivery-tracker](https://github.com/metarya07/last-mile-delivery-tracker) (Branch: `main`) |
+| **System Design Document** | [SYSTEM_DESIGN.md](./SYSTEM_DESIGN.md) (618 words, covering pricing, zones, dispatch, and failed deliveries) |
 
 ---
 
-## 🎯 Key Capabilities & Features
+## 🔑 Quick Demo Credentials (1-Click Login Available)
 
-1. **Multi-Role Portal Experience**:
-   - **Customer Portal**: Self-registration, interactive fare calculator preview, order booking desk, live order tracking timeline, failed delivery rescheduling, and "Become a Delivery Partner" application workflow.
-   - **Delivery Partner Portal**: Real-time package queue, active run management, 1-click availability toggle, milestone progression (Picked Up &rarr; In Transit &rarr; Out for Delivery &rarr; Delivered / Failed with reason), and delivery history.
-   - **Admin Control Center**: Operations dashboard, centralized order registry, pending dispatch queue, manual and intelligent **auto-assignment**, zone & area hierarchy manager, dynamic B2B/B2C rate card editor, COD surcharge configurator, partner application reviews with instant role promotion, and audit trail inspector.
+The application includes pre-seeded accounts for every role:
 
-2. **Dynamic Rate Calculation Engine**:
-   - **Volumetric Weight**: Calculated using the international air/road standard formula:
+| Role | Email | Password | Primary Capabilities |
+|---|---|---|---|
+| **Administrator** | `admin@lastmile.com` | `password123` | Full system control, rate cards & zones, audit logs, override statuses |
+| **Dispatcher / Ops** | `dispatcher@lastmile.com` | `password123` | Live dispatch desk, auto-assignment, agent allocation, runs |
+| **Delivery Agent** | `agent@lastmile.com` | `password123` | Duty toggle, milestone updates (Picked Up &rarr; Delivered/Failed), POD |
+| **Warehouse Staff** | `warehouse@lastmile.com` | `password123` | Inbound package intake, zone sorting, hub transfer management |
+| **Customer** | `customer@lastmile.com` | `password123` | Self-booking with instant fare engine, live tracking, reschedule failed attempts |
+
+---
+
+## 🎯 Key Capabilities & Core Workflows
+
+1. **Dynamic Rate Calculation Engine**:
+   - **Volumetric Weight**: Calculated using the international logistics standard:
      $$\text{Volumetric Weight (kg)} = \frac{\text{Length (cm)} \times \text{Width (cm)} \times \text{Height (cm)}}{5000}$$
-   - **Chargeable Weight**: Evaluates the higher of actual gross weight vs. volumetric weight:
+   - **Chargeable Weight**: Evaluates the higher of actual weight vs. volumetric weight:
      $$\text{Chargeable Weight} = \max(\text{Actual Weight}, \text{Volumetric Weight})$$
-   - **Route Rate Card Lookup**: Dynamic matrix lookup matching `pickupZoneId`, `dropZoneId`, and `orderType` (`B2B` or `B2C`).
+   - **Directional Route Matrix**: Dynamic lookup matching `pickupZoneId`, `dropZoneId`, and `orderType` (`B2B` or `B2C`).
    - **Base Charge**: Calculated as $\max(\text{Chargeable Weight} \times \text{Rate Per Kg}, \text{Minimum Charge})$.
-   - **COD Surcharge**: Admin-configurable surcharge added when payment type is `COD`.
-   - **Pre-Booking Estimate**: Fare breakdown preview is computed in real-time before order placement.
+   - **COD Surcharge**: Admin-configurable surcharge applied when payment type is `COD`.
+   - **Real-Time Pre-Booking Estimate**: Computes complete fare breakdowns before order placement without hardcoded constants.
 
-3. **Intelligent Driver Auto-Assignment**:
-   - Analyzes available fleet agents based on operating zone preference (preferred area match) and load balances against current active delivery queues.
+2. **Intelligent Driver Auto-Assignment**:
+   - Evaluates active online fleet agents (`role = DELIVERY_AGENT` and `available = TRUE`).
+   - Matches driver preferred operating territory against the order pickup zone.
+   - Load balances across active delivery queues to minimize transit latency.
 
-4. **Immutable Tracking & Audit History**:
-   - Every status transition creates a permanent tracking record capturing the exact timestamp, actor ID, and actor name.
+3. **Immutable Tracking & Audit History**:
+   - Every status transition creates an immutable record in `order_tracking_history` logging the exact timestamp, actor ID, and actor role.
 
-5. **Failed Delivery Recovery & Rescheduling**:
-   - Delivery agents record failure reasons on unsuccessful attempts.
-   - Customers receive notifications and can select a retry date and delivery instructions. The order resets to `RESCHEDULED` and unassigns the driver for fresh dispatch.
+4. **Failed Delivery Recovery & Self-Service Rescheduling**:
+   - Agents record structured failure reasons (*Customer Unavailable*, *Address Incomplete*, *Access Denied*).
+   - Customers receive notifications with a direct self-service link to select a new delivery date and notes.
+   - The order transitions to `RESCHEDULED`, unassigns the previous agent, and re-enters the dispatch queue for fresh allocation.
 
-6. **Email & SMS Notifications**:
-   - Triggered on order creation, status transitions, delivery attempts, and password reset OTPs.
+5. **Multi-Channel Notifications (Brevo HTTPS REST API + SMS)**:
+   - Dispatches branded responsive HTML emails for password reset OTPs, order placement confirmations, and live shipment milestone updates.
 
 ---
 
@@ -47,11 +63,11 @@ A full-stack, enterprise-grade logistics and delivery management platform. Built
 
 | Layer | Technologies |
 |---|---|
-| **Backend** | Java 26 / 21, Spring Boot 3.4+, Spring Security 6 (Stateless JWT), Spring Data JPA, Hibernate, Flyway Database Migrations |
-| **Frontend** | React 19, Vite, Modern Vanilla CSS Design System with responsive breakpoints (320px to 1920px), SVG Icon Library |
-| **Database** | MySQL 8.0+ / PostgreSQL compatible |
-| **Notifications** | Brevo SMTP (Email) & Brevo Transactional SMS API |
-| **Deployment** | Vercel (Frontend), Docker / JVM (Backend) |
+| **Backend** | Java 26 / 21, Spring Boot 4 / 3.4+, Spring Security 6 (Stateless JWT + RBAC), Spring Data JPA, Hibernate 7, Flyway Database Migrations |
+| **Frontend** | React 19, Vite, Responsive Vanilla CSS Design System (320px to 1920px), SVG Icon System |
+| **Database** | MySQL 8.0+ / PostgreSQL compatible (Flyway migrations V1 &ndash; V7) |
+| **Notifications** | Brevo HTTPS REST API (Port 443) & Brevo Transactional SMS |
+| **Deployment** | Vercel (Frontend), Render Docker/JVM (Backend) |
 
 ---
 
@@ -63,75 +79,41 @@ A full-stack, enterprise-grade logistics and delivery management platform. Built
 - MySQL 8.0+ running on `localhost:3306`
 
 ### 1. Database Setup
-Create the MySQL database:
 ```sql
 CREATE DATABASE last_mile_delivery;
 ```
-*(Flyway automatically applies all 4 schema migrations: V1 base tables, V2 zones & rate cards, V3 tracking & attempts, V4 partner applications).*
+*(Flyway automatically applies all schema migrations: V1 base schema through V7 demo accounts and zone seed data).*
 
 ### 2. Backend Setup
-Navigate to the `backend` directory:
 ```bash
 cd backend
 ```
-Create an `application-local.properties` or `.env` file (or set environment variables):
-```properties
-# Backend Environment Configuration
-server.port=8080
-CORS_ALLOWED_ORIGIN=http://localhost:5173
-JWT_SECRET=404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
-JWT_EXPIRATION=86400000
-
-# MySQL
-DB_USERNAME=root
-DB_PASSWORD=your_mysql_password
-spring.datasource.url=jdbc:mysql://localhost:3306/last_mile_delivery?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Kolkata
-
-# Brevo Email & SMS (Optional for local testing)
-BREVO_SMTP_HOST=smtp-relay.brevo.com
-BREVO_SMTP_PORT=587
-BREVO_SMTP_USERNAME=your_brevo_smtp_username
-BREVO_SMTP_PASSWORD=your_brevo_smtp_password
-BREVO_FROM_EMAIL=dispatch@lastmiledelivery.com
-BREVO_API_KEY=your_brevo_api_key
-BREVO_SMS_SENDER=LASTMILE
-```
-
-Run the backend:
+Copy `.env.example` to `.env` or set environment variables:
 ```bash
-# Windows
-.\mvnw spring-boot:run
+# Windows PowerShell
+cp ../.env.example .env
 
-# Linux / macOS
-./mvnw spring-boot:run
+# Run Spring Boot backend
+.\mvnw spring-boot:run
 ```
 
-Run tests:
+Run test suite:
 ```bash
 .\mvnw test
 ```
+*(All 23 unit and integration tests will pass).*
 
 ### 3. Frontend Setup
-Navigate to the `frontend` directory:
 ```bash
 cd frontend
 npm install
-```
-
-Configure `.env.local`:
-```env
-VITE_API_BASE_URL=http://localhost:8080
-```
-
-Start the Vite development server:
-```bash
 npm run dev
 ```
 Open `http://localhost:5173` in your browser.
 
 ---
 
-## 🗄️ Database Schema & Entity Architecture
+## 🗄️ Database Schema & Entity Relationships
 
 ```
                                   +-------------------+
@@ -203,62 +185,57 @@ Open `http://localhost:5173` in your browser.
 
 ## 📡 REST API Reference
 
-### 1. Authentication (`/api/auth`)
+### 1. Authentication & Security (`/api/auth`)
 | Method | Endpoint | Access | Description |
 |---|---|---|---|
 | `POST` | `/api/auth/register` | Public | Register customer account |
-| `POST` | `/api/auth/login` | Public | Sign in with email & password, returns JWT token |
-| `GET` | `/api/auth/profile` | Authenticated | Retrieve authenticated user profile & role |
-| `POST` | `/api/auth/forgot-password` | Public | Generate & dispatch 6-digit password reset OTP |
-| `POST` | `/api/auth/verify-otp` | Public | Validate reset OTP |
-| `POST` | `/api/auth/reset-password` | Public | Set new password with verified OTP |
+| `POST` | `/api/auth/login` | Public | Authenticate user & return stateless JWT |
+| `GET` | `/api/auth/profile` | Authenticated | Retrieve authenticated user profile & permissions |
+| `POST` | `/api/auth/forgot-password` | Public | Generate & dispatch 6-digit HTML OTP email |
+| `POST` | `/api/auth/verify-otp` | Public | Verify OTP code |
+| `POST` | `/api/auth/reset-password` | Public | Reset account password with valid OTP |
 
-### 2. Orders & Tracking (`/api/orders`)
+### 2. Orders & Tracking Lifecycle (`/api/orders`)
 | Method | Endpoint | Access | Description |
 |---|---|---|---|
 | `POST` | `/api/orders` | Customer / Admin | Book order (Admin can pass `customerId` to book on behalf) |
-| `GET` | `/api/orders` | Authenticated | Get user's orders (Customer: own, Agent: assigned, Admin: all) |
-| `GET` | `/api/orders/{id}` | Authenticated | Get single order details |
-| `PATCH` | `/api/orders/{id}/status` | Agent / Admin | Transition status (`PICKED_UP`, `IN_TRANSIT`, `DELIVERED`, `FAILED`) |
-| `POST` | `/api/orders/{id}/assign/{agentId}` | Admin | Manually assign order to online delivery agent |
-| `POST` | `/api/orders/{id}/auto-assign` | Admin | Intelligently assign nearest/least-loaded agent |
-| `POST` | `/api/orders/{id}/reschedule` | Customer / Admin | Reschedule a `FAILED` order for a new delivery attempt |
-| `GET` | `/api/orders/{id}/tracking` | Authenticated | Fetch full immutable tracking audit timeline |
-| `GET` | `/api/orders/{id}/attempts` | Authenticated | Fetch delivery attempt records and failure reasons |
+| `GET` | `/api/orders` | Authenticated | Fetch orders by role (Customer: own, Agent: assigned, Admin: all) |
+| `GET` | `/api/orders/{id}` | Authenticated | Retrieve order details & pricing breakdown |
+| `PATCH` | `/api/orders/{id}/status` | Agent / Admin | Update status (`PICKED_UP`, `IN_TRANSIT`, `DELIVERED`, `FAILED`) |
+| `POST` | `/api/orders/{id}/assign/{agentId}` | Admin / Dispatcher | Manually assign order to delivery agent |
+| `POST` | `/api/orders/{id}/auto-assign` | Admin / Dispatcher | Auto-allocate nearest & least-loaded online agent |
+| `POST` | `/api/orders/{id}/reschedule` | Customer / Admin | Reschedule a `FAILED` order for a future date |
+| `GET` | `/api/orders/{id}/tracking` | Authenticated | Retrieve full immutable tracking audit timeline |
+| `GET` | `/api/orders/{id}/attempts` | Authenticated | Retrieve delivery attempts & failure reasons |
 
 ### 3. Rate Calculation Engine & Zones (`/api`)
 | Method | Endpoint | Access | Description |
 |---|---|---|---|
 | `POST` | `/api/rates/estimate` | Public / Auth | Live pre-booking rate estimate from dimensions & weight |
-| `GET` | `/api/zones` | Public / Auth | List all zones with assigned geographic areas |
+| `GET` | `/api/zones` | Public / Auth | List all configured delivery zones & areas |
 | `POST` | `/api/zones` | Admin | Create a new delivery zone |
-| `POST` | `/api/zones/{id}/areas` | Admin | Assign an area or neighborhood to a zone |
-| `GET` | `/api/rates` | Admin | List all configured rate cards |
-| `POST` | `/api/rates` | Admin | Create or update an intra/inter-zone rate card |
-| `PUT` | `/api/rates/{id}` | Admin | Edit an existing rate card |
+| `POST` | `/api/zones/{id}/areas` | Admin | Assign neighborhood/area to a zone |
+| `GET` | `/api/rates` | Admin | List all route rate cards |
+| `POST` | `/api/rates` | Admin | Create or update rate card |
+| `PUT` | `/api/rates/{id}` | Admin | Edit rate card rates and minimum charge |
 | `GET` | `/api/rates/cod` | Admin | List COD surcharge rules |
 | `PUT` | `/api/rates/cod` | Admin | Update COD surcharge per order type |
 
-### 4. Delivery Partner Applications (`/api/delivery-partner-applications`)
+### 4. Partner Applications & Fleet (`/api`)
 | Method | Endpoint | Access | Description |
 |---|---|---|---|
-| `POST` | `/api/delivery-partner-applications` | Customer | Submit "Become a Delivery Partner" application |
-| `GET` | `/api/delivery-partner-applications/my` | Customer | Check applicant's review status |
-| `GET` | `/api/delivery-partner-applications` | Admin | View all partner applications |
-| `POST` | `/api/delivery-partner-applications/{id}/approve` | Admin | Approve application & promote user to `DELIVERY_AGENT` |
-| `POST` | `/api/delivery-partner-applications/{id}/reject` | Admin | Reject application with reason |
-
-### 5. Fleet & User Management (`/api/users`)
-| Method | Endpoint | Access | Description |
-|---|---|---|---|
-| `GET` | `/api/users/agents` | Admin | List all registered delivery agents and duty status |
-| `PATCH` | `/api/users/availability` | Delivery Agent | Toggle duty status (Online / Offline) |
+| `POST` | `/api/delivery-partner-applications` | Customer | Submit driver onboarding application |
+| `GET` | `/api/delivery-partner-applications/my` | Customer | Check applicant status |
+| `GET` | `/api/delivery-partner-applications` | Admin / Dispatcher | Review all pending applications |
+| `POST` | `/api/delivery-partner-applications/{id}/approve` | Admin / Dispatcher | Approve application & promote to `DELIVERY_AGENT` |
+| `POST` | `/api/delivery-partner-applications/{id}/reject` | Admin / Dispatcher | Reject application with feedback reason |
+| `PATCH` | `/api/users/availability` | Delivery Agent | Toggle driver online/offline duty status |
 
 ---
 
-## 🧮 Rate Calculation Logic Example
+## 🧮 Rate Calculation Example Walkthrough
 
-Consider an order booked between **Zone 1 (North)** and **Zone 2 (South)**:
+Consider a parcel booked between **Zone 1 (North)** and **Zone 2 (South)**:
 - **Dimensions**: Length = 40 cm, Width = 30 cm, Height = 25 cm
 - **Actual Weight**: 4.00 kg
 - **Order Type**: B2C
@@ -281,22 +258,28 @@ Consider an order booked between **Zone 1 (North)** and **Zone 2 (South)**:
 5. **COD Surcharge**:
    - Configured COD surcharge for B2C = ₹30.00
 
-6. **Final Total Charge**:
+6. **Final Total Billable Amount**:
    $$\text{Total Charge} = \text{₹}210.00 + \text{₹}30.00 = \textbf{₹240.00}$$
 
 ---
 
-## 🧪 Test Suite & Verification
+## 🧪 Test Suite & Verification Results
 
-The project includes an automated JUnit 5 / Spring Boot test suite covering:
-- Rate calculation engine logic (volumetric divisor, chargeable weight comparison, minimum charge enforcement, COD surcharge rules).
-- Role-based authorization and security filters.
-- Partner application validation and role promotion workflows.
-- Immutable tracking audit logging.
-
-Run backend tests:
 ```bash
 cd backend
 .\mvnw test
 ```
-Result: **11/11 tests pass (100% success rate)**.
+
+**JUnit 5 Test Results**:
+```text
+[INFO] Running com.lastmile.delivery.DeliveryPartnerApplicationTests
+[INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Running com.lastmile.delivery.LastMileDeliveryApplicationTests
+[INFO] Tests run: 1, Failures: 0, Errors: 0, Skipped: 0
+[INFO] Running com.lastmile.delivery.RbacSecurityTests
+[INFO] Tests run: 12, Failures: 0, Errors: 0, Skipped: 0
+[INFO] ------------------------------------------------------------------------
+[INFO] BUILD SUCCESS
+[INFO] Tests run: 23, Failures: 0, Errors: 0, Skipped: 0
+[INFO] ------------------------------------------------------------------------
+```
