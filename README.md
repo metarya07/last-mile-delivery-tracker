@@ -139,6 +139,30 @@ Final Billable Charge    = ₹210.00 + ₹30.00 = ₹240.00
 
 ---
 
+## 🛠️ Industry-Standard Technologies & Architecture Matrix
+
+| Layer / Domain | Technology | Industry Standard / Production Role |
+|---|---|---|
+| **Core Language** | **Java 21 / 26 LTS** | Modern enterprise runtime utilizing immutable Records, Pattern Matching, and Switch Expressions |
+| **Microservice Framework** | **Spring Boot 4.1.1** | Enterprise application foundation with auto-configuration and Actuator monitoring |
+| **Security & Auth** | **Spring Security 6** | Stateless Bearer JWT filter chain, BCrypt cryptographic password hashing (cost factor 10) |
+| **Access Control (RBAC)** | **Granular Role Matrix** | 5 distinct roles (`ADMIN`, `DISPATCHER`, `DELIVERY_AGENT`, `WAREHOUSE`, `CUSTOMER`) with custom evaluators |
+| **Persistence & ORM** | **Spring Data JPA / Hibernate 7** | ACID transactions (`@Transactional`), Criteria API, and relational mappings |
+| **Connection Pooling** | **HikariCP** | High-performance enterprise JDBC connection pool with leak detection and auto-recovery |
+| **Schema Migrations** | **Flyway (V1 – V7)** | Version-controlled schema evolution with automated repair strategies and seeding |
+| **Frontend Framework** | **React 19** | Concurrent rendering, custom hooks (`useAuth`), and memoization (`useMemo`, `useCallback`) |
+| **Build & Bundling** | **Vite 8.2.2** | Next-generation ES module bundler, tree-shaking, sub-350ms production builds |
+| **UI Design System** | **Vanilla CSS 3** | Responsive CSS custom properties, clamp functions, 320px–1920px fluid layouts, zero runtime overhead |
+| **Vector Graphics** | **SVG Sprite System** | Zero-dependency scalable vector iconography |
+| **Email Infrastructure** | **Brevo HTTPS REST API (Port 443)** | Transactional email dispatch over HTTPS, bypassing cloud SMTP port blocking (with SMTP fallback) |
+| **SMS Infrastructure** | **Brevo SMS Gateway** | Transactional SMS API for phone OTP and delivery status alerts |
+| **Audit & Governance** | **Immutable History** | Dedicated `audit_logs` and `order_tracking_history` ledgers capturing actor, role, and timestamp |
+| **Logistics Pricing** | **IATA Air/Road Formula** | Standard volumetric divisor ($\frac{L \times W \times H}{5000}$) and chargeable weight evaluation |
+| **Quality & Testing** | **JUnit 5 & AssertJ** | Automated test suite validating pricing, RBAC, and lifecycle transitions (**23/23 tests passing**) |
+| **Cloud Hosting** | **Vercel + Render** | Edge CDN distribution for React frontend + Containerized Docker JVM on Render backend |
+
+---
+
 ## 🚀 Local Setup & Installation
 
 ### Prerequisites
