@@ -28,11 +28,11 @@ export function CreateOrderView({ onOrderCreated, isAdmin = false }) {
     rateApi.getZones().then((data) => {
       if (data && data.length > 0) {
         setZones(data)
-        if (!data.some((z) => z.id === pickupZoneId)) setPickupZoneId(data[0].id)
-        if (!data.some((z) => z.id === dropZoneId)) setDropZoneId(data[data.length > 1 ? 1 : 0].id)
+        setPickupZoneId((prev) => (data.some((z) => z.id === prev) ? prev : data[0].id))
+        setDropZoneId((prev) => (data.some((z) => z.id === prev) ? prev : (data[1]?.id || data[0].id)))
       }
     }).catch(() => {})
-  }, [pickupZoneId, dropZoneId])
+  }, [])
 
   // Volumetric weight: (L * W * H) / 5000
   const estimatedVolumetricWeight = useMemo(() => {
