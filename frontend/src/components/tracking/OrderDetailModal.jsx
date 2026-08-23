@@ -135,6 +135,43 @@ export function OrderDetailModal({ isOpen, onClose, orderId }) {
                     </div>
                   </div>
                 </div>
+
+                {order.currentLatitude && order.currentLongitude && (
+                  <div style={{ marginTop: '14px', padding: '10px', background: '#f0fdf4', borderRadius: '6px', border: '1px solid #bbf7d0' }}>
+                    <p style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: 600, color: '#166534' }}>
+                      📍 Real-Time GPS Tracking Broadcast
+                    </p>
+                    <p style={{ margin: '0 0 6px 0', fontSize: '13px' }}>
+                      Latitude: <strong>{order.currentLatitude}</strong>, Longitude: <strong>{order.currentLongitude}</strong>
+                    </p>
+                    <a
+                      href={`https://www.google.com/maps?q=${order.currentLatitude},${order.currentLongitude}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-table-primary"
+                      style={{ display: 'inline-block', fontSize: '12px', padding: '4px 10px', textDecoration: 'none' }}
+                    >
+                      Open Live Map &rarr;
+                    </a>
+                  </div>
+                )}
+
+                {order.podUrl && (
+                  <div style={{ marginTop: '14px', padding: '10px', background: '#eff6ff', borderRadius: '6px', border: '1px solid #bfdbfe' }}>
+                    <p style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: 600, color: '#1e40af' }}>
+                      📦 Digital Proof of Delivery (POD)
+                    </p>
+                    <a
+                      href={order.podUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="btn-table-primary"
+                      style={{ display: 'inline-block', fontSize: '12px', padding: '4px 10px', textDecoration: 'none' }}
+                    >
+                      View POD Document / Photo &rarr;
+                    </a>
+                  </div>
+                )}
               </div>
 
               <div className="detail-card">

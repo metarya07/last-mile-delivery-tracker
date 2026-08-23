@@ -28,6 +28,9 @@ export function StatusTransitionModal({ isOpen, onClose, order, onStatusUpdated 
   const [selectedStatus, setSelectedStatus] = useState('')
   const [failureReason, setFailureReason] = useState('')
   const [customReason, setCustomReason] = useState('')
+  const [podUrl, setPodUrl] = useState('')
+  const [recipientName, setRecipientName] = useState('')
+  const [podNotes, setPodNotes] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
 
@@ -37,6 +40,9 @@ export function StatusTransitionModal({ isOpen, onClose, order, onStatusUpdated 
     setSelectedStatus('')
     setFailureReason('')
     setCustomReason('')
+    setPodUrl('')
+    setRecipientName('')
+    setPodNotes('')
     setError('')
     onClose()
   }
@@ -58,6 +64,14 @@ export function StatusTransitionModal({ isOpen, onClose, order, onStatusUpdated 
     setError('')
 
     try {
+      if (targetStatus === 'DELIVERED' && podUrl.trim()) {
+        await orderApi.uploadProofOfDelivery(order.id, {
+          podUrl: podUrl.trim(),
+          recipientName: recipientName.trim() || undefined,
+          notes: podNotes.trim() || undefined,
+        }).catch(() => {})
+      }
+
       const updated = await orderApi.updateStatus(order.id, {
         status: targetStatus,
         failureReason: reason,
@@ -108,6 +122,42 @@ export function StatusTransitionModal({ isOpen, onClose, order, onStatusUpdated 
                   ))}
                 </select>
               </label>
+
+              {targetStatus === 'DELIVERED' && (
+                <div className="pod-box" style={{ background: 'var(--bg-secondary, #f8fafc)', padding: '12px', borderRadius: '6px', marginTop: '10px' }}>
+                  <p style={{ fontWeight: 600, fontSize: '13px', margin: '0 0 8px 0' }}>Proof of Delivery (Optional):</p>
+                  <label style={{ display: 'block', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '12px' }}>Recipient Name:</span>
+                    <input
+                      type="text"
+                      placeholder="e.g. John Doe"
+                      value={recipientName}
+                      onChange={(e) => setRecipientName(e.target.value)}
+                      style={{ width: '100%', marginTop: '4px' }}
+                    />
+                  </label>
+                  <label style={{ display: 'block', marginBottom: '8px' }}>
+                    <span style={{ fontSize: '12px' }}>Proof of Delivery Image / Document URL:</span>
+                    <input
+                      type="url"
+                      placeholder="https://example.com/pod-photo.jpg"
+                      value={podUrl}
+                      onChange={(e) => setPodUrl(e.target.value)}
+                      style={{ width: '100%', marginTop: '4px' }}
+                    />
+                  </label>
+                  <label style={{ display: 'block' }}>
+                    <span style={{ fontSize: '12px' }}>Delivery Notes:</span>
+                    <input
+                      type="text"
+                      placeholder="e.g. Left at security desk"
+                      value={podNotes}
+                      onChange={(e) => setPodNotes(e.target.value)}
+                      style={{ width: '100%', marginTop: '4px' }}
+                    />
+                  </label>
+                </div>
+              )}
 
               {targetStatus === 'FAILED' && (
                 <div className="failure-reason-box">

@@ -1,8 +1,13 @@
+import { useState } from 'react'
 import { StatusBadge } from '../common/StatusBadge'
 import { formatCurrency } from '../../utils/formatters'
 import { IconArrowRight } from '../common/Icons'
+import { orderApi } from '../../api/orderApi'
 
-export function ActiveDeliveryCard({ order, onUpdateStatus, onViewDetails }) {
+export function ActiveDeliveryCard({ order, onUpdateStatus, onViewDetails, onOrderUpdated }) {
+  const [broadcastingGps, setBroadcastingGps] = useState(false)
+  const [gpsFeedback, setGpsFeedback] = useState('')
+
   if (!order) {
     return (
       <div className="active-run-card active-run-empty">
@@ -14,6 +19,37 @@ export function ActiveDeliveryCard({ order, onUpdateStatus, onViewDetails }) {
           You have no orders currently in active progress. Pick an assigned order from your queue below to begin delivery milestones.
         </p>
       </div>
+    )
+  }
+
+  const handleBroadcastGps = () => {
+    if (!navigator.geolocation) {
+      setGpsFeedback('Geolocation is not supported by your device browser.')
+      return
+    }
+
+    setBroadcastingGps(true)
+    setGpsFeedback('')
+
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const lat = parseFloat(pos.coords.latitude.toFixed(6))
+          const lng = parseFloat(pos.coords.longitude.toFixed(6))
+          const updated = await orderApi.updateLocation(order.id, { latitude: lat, longitude: lng })
+          setGpsFeedback(`📍 GPS broadcasted: (${lat}, ${lng})`)
+          if (onOrderUpdated) onOrderUpdated(updated)
+        } catch (err) {
+          setGpsFeedback(`GPS update failed: ${err.message}`)
+        } finally {
+          setBroadcastingGps(false)
+        }
+      },
+      (err) => {
+        setBroadcastingGps(false)
+        setGpsFeedback(`GPS acquisition error: ${err.message}`)
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
     )
   }
 
@@ -58,8 +94,19 @@ export function ActiveDeliveryCard({ order, onUpdateStatus, onViewDetails }) {
           <div className="meta-pill">
             <span>Weight:</span> <strong>{order.chargeableWeightKg != null ? `${order.chargeableWeightKg} kg` : 'N/A'}</strong>
           </div>
+          {order.currentLatitude && order.currentLongitude && (
+            <div className="meta-pill">
+              <span>GPS:</span> <strong>{order.currentLatitude}, {order.currentLongitude}</strong>
+            </div>
+          )}
         </div>
       </div>
+
+      {gpsFeedback && (
+        <div style={{ margin: '8px 0', fontSize: '13px', color: 'var(--text-muted, #475569)' }}>
+          {gpsFeedback}
+        </div>
+      )}
 
       <div className="active-run-footer">
         <button
@@ -71,6 +118,14 @@ export function ActiveDeliveryCard({ order, onUpdateStatus, onViewDetails }) {
         >
           <span>Advance / Update Status</span>
           <IconArrowRight size={16} />
+        </button>
+        <button
+          type="button"
+          className="btn-secondary"
+          onClick={handleBroadcastGps}
+          disabled={broadcastingGps || order.status === 'DELIVERED'}
+        >
+          {broadcastingGps ? 'Broadcasting GPS...' : '📍 Broadcast Live GPS'}
         </button>
         <button
           type="button"
