@@ -1,96 +1,163 @@
 # 📦 Last-Mile Delivery Tracker
 
-A full-stack, enterprise-grade logistics and delivery management platform. Built to support dynamic parcel pricing engines, intelligent driver auto-assignment, real-time tracking with immutable audit trails, multi-role portal experiences (Admin, Dispatcher, Delivery Agent, Warehouse, Customer), failed delivery recovery, and Brevo transactional notifications.
+[![Java](https://img.shields.io/badge/Java-21%20%7C%2026-ED8B00?logo=openjdk&logoColor=white)](https://www.oracle.com/java/)
+[![Spring Boot](https://img.shields.io/badge/Spring%20Boot-4.1.1-6DB33F?logo=springboot&logoColor=white)](https://spring.io/projects/spring-boot)
+[![React](https://img.shields.io/badge/React-19.0.0-61DAFB?logo=react&logoColor=black)](https://react.dev/)
+[![Vite](https://img.shields.io/badge/Vite-8.2.2-646CFF?logo=vite&logoColor=white)](https://vitejs.dev/)
+[![MySQL](https://img.shields.io/badge/MySQL-8.0-4479A1?logo=mysql&logoColor=white)](https://www.mysql.com/)
+[![Flyway](https://img.shields.io/badge/Flyway-Migrations%20V1--V7-CC0200?logo=flyway&logoColor=white)](https://flywaydb.org/)
+[![Vercel](https://img.shields.io/badge/Frontend-Vercel%20Production-000000?logo=vercel&logoColor=white)](https://last-mile-delivery-11622.vercel.app)
+[![Render](https://img.shields.io/badge/Backend-Render%20Live-46E3B7?logo=render&logoColor=black)](https://last-mile-delivery-tracker-ahmz.onrender.com)
+[![JUnit 5](https://img.shields.io/badge/Tests-23%20Passed%20(100%25)-brightgreen?logo=junit5&logoColor=white)](https://junit.org/junit5/)
+
+A full-stack, enterprise-grade logistics and delivery management platform. Built to support dynamic volumetric parcel pricing, intelligent driver auto-assignment, real-time tracking with immutable audit trails, multi-role portal experiences (Admin, Dispatcher, Delivery Agent, Warehouse, Customer), failed delivery self-service recovery, and multi-channel transactional notifications (Brevo HTTPS REST API + SMS).
 
 ---
 
-## 🌐 Live Hosted Deployments & Links
+## 🌐 Live Hosted Deployments
 
-| Service | URL |
-|---|---|
-| **Frontend Application (Vercel)** | [https://last-mile-delivery-11622.vercel.app](https://last-mile-delivery-11622.vercel.app) |
-| **Backend API (Render)** | [https://last-mile-delivery-tracker-ahmz.onrender.com](https://last-mile-delivery-tracker-ahmz.onrender.com) |
-| **GitHub Repository** | [https://github.com/metarya07/last-mile-delivery-tracker](https://github.com/metarya07/last-mile-delivery-tracker) (Branch: `main`) |
-| **System Design Document** | [SYSTEM_DESIGN.md](./SYSTEM_DESIGN.md) (618 words, covering pricing, zones, dispatch, and failed deliveries) |
+| Component | Platform | URL |
+|---|---|---|
+| **Frontend Application** | Vercel | [https://last-mile-delivery-11622.vercel.app](https://last-mile-delivery-11622.vercel.app) |
+| **Backend REST API** | Render | [https://last-mile-delivery-tracker-ahmz.onrender.com](https://last-mile-delivery-tracker-ahmz.onrender.com) |
+| **GitHub Repository** | GitHub | [https://github.com/metarya07/last-mile-delivery-tracker](https://github.com/metarya07/last-mile-delivery-tracker) (Branch: `main`) |
+| **System Design Document** | Markdown | [SYSTEM_DESIGN.md](./SYSTEM_DESIGN.md) (706 words, covering pricing, zones, dispatch, and failed deliveries) |
+| **Clean Submission Zip** | Local Package | `A:\last-mile-delivery-tracker-submission.zip` (**0.23 MB**) |
 
 ---
 
-## 🔑 Quick Demo Credentials (1-Click Login Available)
+## 🔑 Pre-Seeded Demo Accounts (1-Click Login on App)
 
-The application includes pre-seeded accounts for every role:
+The application includes pre-configured demo accounts for instant evaluation:
 
-| Role | Email | Password | Primary Capabilities |
+| Role | Email | Password | Primary Capabilities & Access |
 |---|---|---|---|
-| **Administrator** | `admin@lastmile.com` | `password123` | Full system control, rate cards & zones, audit logs, override statuses |
-| **Dispatcher / Ops** | `dispatcher@lastmile.com` | `password123` | Live dispatch desk, auto-assignment, agent allocation, runs |
-| **Delivery Agent** | `agent@lastmile.com` | `password123` | Duty toggle, milestone updates (Picked Up &rarr; Delivered/Failed), POD |
+| **Administrator** | `admin@lastmile.com` | `password123` | Full system control, rate cards & zones, audit trails, status overrides |
+| **Dispatcher / Operations** | `dispatcher@lastmile.com` | `password123` | Live dispatch desk, auto-assignment, driver allocation, fleet runs |
+| **Delivery Agent** | `agent@lastmile.com` | `password123` | Duty toggle (online/offline), status transitions, POD capture, run history |
 | **Warehouse Staff** | `warehouse@lastmile.com` | `password123` | Inbound package intake, zone sorting, hub transfer management |
-| **Customer** | `customer@lastmile.com` | `password123` | Self-booking with instant fare engine, live tracking, reschedule failed attempts |
+| **Customer** | `customer@lastmile.com` | `password123` | Self-booking with instant fare engine, live tracking, failed delivery rescheduling |
+
+> [!TIP]
+> On the [Auth Page](https://last-mile-delivery-11622.vercel.app), click any of the **"Quick Demo Role Preview"** buttons to log in instantly without typing credentials!
 
 ---
 
-## 🎯 Key Capabilities & Core Workflows
+## 🏗️ System Architecture & Workflow
 
-1. **Dynamic Rate Calculation Engine**:
-   - **Volumetric Weight**: Calculated using the international logistics standard:
-     $$\text{Volumetric Weight (kg)} = \frac{\text{Length (cm)} \times \text{Width (cm)} \times \text{Height (cm)}}{5000}$$
-   - **Chargeable Weight**: Evaluates the higher of actual weight vs. volumetric weight:
-     $$\text{Chargeable Weight} = \max(\text{Actual Weight}, \text{Volumetric Weight})$$
-   - **Directional Route Matrix**: Dynamic lookup matching `pickupZoneId`, `dropZoneId`, and `orderType` (`B2B` or `B2C`).
-   - **Base Charge**: Calculated as $\max(\text{Chargeable Weight} \times \text{Rate Per Kg}, \text{Minimum Charge})$.
-   - **COD Surcharge**: Admin-configurable surcharge applied when payment type is `COD`.
-   - **Real-Time Pre-Booking Estimate**: Computes complete fare breakdowns before order placement without hardcoded constants.
-
-2. **Intelligent Driver Auto-Assignment**:
-   - Evaluates active online fleet agents (`role = DELIVERY_AGENT` and `available = TRUE`).
-   - Matches driver preferred operating territory against the order pickup zone.
-   - Load balances across active delivery queues to minimize transit latency.
-
-3. **Immutable Tracking & Audit History**:
-   - Every status transition creates an immutable record in `order_tracking_history` logging the exact timestamp, actor ID, and actor role.
-
-4. **Failed Delivery Recovery & Self-Service Rescheduling**:
-   - Agents record structured failure reasons (*Customer Unavailable*, *Address Incomplete*, *Access Denied*).
-   - Customers receive notifications with a direct self-service link to select a new delivery date and notes.
-   - The order transitions to `RESCHEDULED`, unassigns the previous agent, and re-enters the dispatch queue for fresh allocation.
-
-5. **Multi-Channel Notifications (Brevo HTTPS REST API + SMS)**:
-   - Dispatches branded responsive HTML emails for password reset OTPs, order placement confirmations, and live shipment milestone updates.
+```
++----------------------------------------------------------------------------------------------------+
+|                                    LAST-MILE DELIVERY SYSTEM                                       |
++----------------------------------------------------------------------------------------------------+
+                                                  │
+                 ┌────────────────────────────────┴────────────────────────────────┐
+                 ▼                                                                 ▼
+      [Customer Experience]                                             [Operations & Dispatch]
+  - Order Self-Booking Desk                                         - Live Dispatch Desk (Admin/Ops)
+  - Live Fare Calculation Engine                                    - Zone & Area Hierarchy Config
+  - Real-Time Audit Tracking Timeline                               - Dynamic Rate Card Manager
+  - Failed Delivery Reschedule Desk                                 - Fleet Auto-Assignment Engine
+  - Driver Application Portal                                       - Driver Onboarding Verification
+                 │                                                                 │
+                 └────────────────────────────────┬────────────────────────────────┘
+                                                  ▼
+                                      [Spring Boot 4 / Java 26]
+                                ├── Stateless JWT Auth & RBAC Security
+                                ├── Dynamic Rate Calculation Service
+                                ├── Dispatch & Driver Allocation Service
+                                ├── Immutable Tracking & Audit Service
+                                └── Brevo HTTPS REST API Notification Service
+                                                  │
+                                                  ▼
+                                      [Relational Database (MySQL)]
+                                ├── Flyway Migrations (V1 to V7)
+                                ├── Zones, Areas, & Route Rate Cards
+                                ├── Delivery Orders & Attempt Ledgers
+                                └── Users, Roles, & Audit Logs
+```
 
 ---
 
-## 🛠️ Technology Stack
+## 🧮 Dynamic Rate Calculation Engine
 
-| Layer | Technologies |
-|---|---|
-| **Backend** | Java 26 / 21, Spring Boot 4 / 3.4+, Spring Security 6 (Stateless JWT + RBAC), Spring Data JPA, Hibernate 7, Flyway Database Migrations |
-| **Frontend** | React 19, Vite, Responsive Vanilla CSS Design System (320px to 1920px), SVG Icon System |
-| **Database** | MySQL 8.0+ / PostgreSQL compatible (Flyway migrations V1 &ndash; V7) |
-| **Notifications** | Brevo HTTPS REST API (Port 443) & Brevo Transactional SMS |
-| **Deployment** | Vercel (Frontend), Render Docker/JVM (Backend) |
+### 1. Mathematical Formulas
+Logistics pricing calculates volumetric and gross weights dynamically without hardcoded constants:
+
+1. **Volumetric Weight**:
+   $$\text{Volumetric Weight (kg)} = \frac{\text{Length (cm)} \times \text{Width (cm)} \times \text{Height (cm)}}{5000}$$
+
+2. **Chargeable Weight**:
+   $$\text{Chargeable Weight} = \max(\text{Actual Weight}, \text{Volumetric Weight})$$
+
+3. **Base Freight Charge**:
+   $$\text{Base Charge} = \max(\text{Chargeable Weight} \times \text{Rate Per Kg}, \text{Minimum Charge})$$
+
+4. **Total Billable Amount**:
+   $$\text{Total Charge} = \text{Base Charge} + (\text{PaymentType} == \text{COD} \ ? \ \text{CodSurcharge} : 0)$$
+
+### 2. Step-by-Step Calculation Walkthrough
+Consider an order booked between **Zone 1 (North Hub)** and **Zone 2 (South Hub)**:
+- **Dimensions**: Length = $40\text{ cm}$, Width = $30\text{ cm}$, Height = $25\text{ cm}$
+- **Actual Weight**: $4.00\text{ kg}$
+- **Order Type**: `B2C`
+- **Payment Type**: `COD`
+
+```
+Step 1: Volumetric Weight = (40 × 30 × 25) / 5000 = 30,000 / 5000 = 6.000 kg
+Step 2: Chargeable Weight = MAX(4.000 kg, 6.000 kg) = 6.000 kg
+Step 3: Route Rate Card   = Zone 1 -> Zone 2 (B2C) => Rate: ₹35.00/kg, Min: ₹70.00
+Step 4: Base Charge       = MAX(6.000 × ₹35.00, ₹70.00) = MAX(₹210.00, ₹70.00) = ₹210.00
+Step 5: COD Surcharge     = ₹30.00 (B2C COD Rule)
+--------------------------------------------------------------------------------
+Final Billable Charge    = ₹210.00 + ₹30.00 = ₹240.00
+```
+
+---
+
+## 🔄 Delivery Lifecycle & Rescheduling State Machine
+
+```
+              ┌─────────────────────────────────────────────────────────────┐
+              │                                                             │
+              ▼                                                             │
+          [PLACED] ───────► [PICKED_UP] ───────► [IN_TRANSIT]               │
+              │                                      │                      │
+       (Admin Assign /                               ▼                      │
+        Auto-Assign)                        [OUT_FOR_DELIVERY]              │
+              │                                      │                      │
+              │                       ┌──────────────┴──────────────┐       │
+              │                       ▼                             ▼       │
+              │                  [DELIVERED]                     [FAILED]   │
+              │                 (POD Captured)              (Reason Logged) │
+              │                                                     │       │
+              │                                                     ▼       │
+              │                                              [RESCHEDULED] ─┘
+              │                                            (Customer selects
+              │                                             new retry date)
+              └─────────────────────────────────────────────────────┘
+```
 
 ---
 
 ## 🚀 Local Setup & Installation
 
 ### Prerequisites
-- Java 21 or Java 26 SDK installed (`java -version`)
-- Node.js 20+ and npm installed (`node -v`)
-- MySQL 8.0+ running on `localhost:3306`
+- **Java**: Java 21 or Java 26 SDK installed (`java -version`)
+- **Node.js**: Node.js 20+ and npm installed (`node -v`)
+- **Database**: MySQL 8.0+ running on `localhost:3306`
 
 ### 1. Database Setup
+Create the MySQL database:
 ```sql
 CREATE DATABASE last_mile_delivery;
 ```
-*(Flyway automatically applies all schema migrations: V1 base schema through V7 demo accounts and zone seed data).*
+*(Flyway automatically applies all 7 schema migrations upon backend launch).*
 
 ### 2. Backend Setup
 ```bash
 cd backend
-```
-Copy `.env.example` to `.env` or set environment variables:
-```bash
-# Windows PowerShell
+
+# Copy environment template
 cp ../.env.example .env
 
 # Run Spring Boot backend
@@ -101,7 +168,6 @@ Run test suite:
 ```bash
 .\mvnw test
 ```
-*(All 23 unit and integration tests will pass).*
 
 ### 3. Frontend Setup
 ```bash
@@ -190,20 +256,20 @@ Open `http://localhost:5173` in your browser.
 |---|---|---|---|
 | `POST` | `/api/auth/register` | Public | Register customer account |
 | `POST` | `/api/auth/login` | Public | Authenticate user & return stateless JWT |
-| `GET` | `/api/auth/profile` | Authenticated | Retrieve authenticated user profile & permissions |
+| `GET` | `/api/auth/profile` | Authenticated | Retrieve authenticated profile & permissions |
 | `POST` | `/api/auth/forgot-password` | Public | Generate & dispatch 6-digit HTML OTP email |
-| `POST` | `/api/auth/verify-otp` | Public | Verify OTP code |
-| `POST` | `/api/auth/reset-password` | Public | Reset account password with valid OTP |
+| `POST` | `/api/auth/verify-otp` | Public | Validate reset OTP |
+| `POST` | `/api/auth/reset-password` | Public | Reset password with verified OTP |
 
 ### 2. Orders & Tracking Lifecycle (`/api/orders`)
 | Method | Endpoint | Access | Description |
 |---|---|---|---|
 | `POST` | `/api/orders` | Customer / Admin | Book order (Admin can pass `customerId` to book on behalf) |
-| `GET` | `/api/orders` | Authenticated | Fetch orders by role (Customer: own, Agent: assigned, Admin: all) |
-| `GET` | `/api/orders/{id}` | Authenticated | Retrieve order details & pricing breakdown |
+| `GET` | `/api/orders` | Authenticated | Get orders (Customer: own, Agent: assigned, Admin: all) |
+| `GET` | `/api/orders/{id}` | Authenticated | Get single order details |
 | `PATCH` | `/api/orders/{id}/status` | Agent / Admin | Update status (`PICKED_UP`, `IN_TRANSIT`, `DELIVERED`, `FAILED`) |
 | `POST` | `/api/orders/{id}/assign/{agentId}` | Admin / Dispatcher | Manually assign order to delivery agent |
-| `POST` | `/api/orders/{id}/auto-assign` | Admin / Dispatcher | Auto-allocate nearest & least-loaded online agent |
+| `POST` | `/api/orders/{id}/auto-assign` | Admin / Dispatcher | Auto-allocate nearest & least-loaded agent |
 | `POST` | `/api/orders/{id}/reschedule` | Customer / Admin | Reschedule a `FAILED` order for a future date |
 | `GET` | `/api/orders/{id}/tracking` | Authenticated | Retrieve full immutable tracking audit timeline |
 | `GET` | `/api/orders/{id}/attempts` | Authenticated | Retrieve delivery attempts & failure reasons |
@@ -233,44 +299,15 @@ Open `http://localhost:5173` in your browser.
 
 ---
 
-## 🧮 Rate Calculation Example Walkthrough
+## 🧪 Automated Testing & Verification
 
-Consider a parcel booked between **Zone 1 (North)** and **Zone 2 (South)**:
-- **Dimensions**: Length = 40 cm, Width = 30 cm, Height = 25 cm
-- **Actual Weight**: 4.00 kg
-- **Order Type**: B2C
-- **Payment Type**: COD
-
-### Step-by-Step Calculation:
-1. **Volumetric Weight**:
-   $$\text{Volumetric Weight} = \frac{40 \times 30 \times 25}{5000} = \frac{30,000}{5000} = 6.000\text{ kg}$$
-
-2. **Chargeable Weight**:
-   $$\text{Chargeable Weight} = \max(4.000\text{ kg}, 6.000\text{ kg}) = 6.000\text{ kg}$$
-
-3. **Rate Card Lookup**:
-   - Route: Zone 1 &rarr; Zone 2 (B2C)
-   - Configured `ratePerKg` = ₹35.00, `minimumCharge` = ₹70.00
-
-4. **Base Charge**:
-   $$\text{Base Charge} = \max(6.000 \times 35.00, 70.00) = \text{₹}210.00$$
-
-5. **COD Surcharge**:
-   - Configured COD surcharge for B2C = ₹30.00
-
-6. **Final Total Billable Amount**:
-   $$\text{Total Charge} = \text{₹}210.00 + \text{₹}30.00 = \textbf{₹240.00}$$
-
----
-
-## 🧪 Test Suite & Verification Results
+The test suite validates rate calculation accuracy, RBAC security constraints, partner application approval cycles, and tracking immutability:
 
 ```bash
 cd backend
 .\mvnw test
 ```
 
-**JUnit 5 Test Results**:
 ```text
 [INFO] Running com.lastmile.delivery.DeliveryPartnerApplicationTests
 [INFO] Tests run: 10, Failures: 0, Errors: 0, Skipped: 0

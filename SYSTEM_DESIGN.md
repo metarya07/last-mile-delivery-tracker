@@ -1,31 +1,31 @@
-# System Design Document: Last-Mile Delivery Tracker
+# System Design Document: Last-Mile Delivery Platform
 
 ## 1. Rate Calculation Engine Architecture
 
-The Rate Calculation Engine calculates fair, volumetric-aware shipping charges dynamically without hardcoded constants.
+The Rate Calculation Engine computes volumetric-aware shipping charges dynamically without hardcoded constants. Pricing rules, minimum thresholds, and surcharges are administered via relational rate cards.
 
 ```
-[Parcel Input: L, W, H, Weight, Zones, B2B/B2C, COD]
-                     │
-                     ▼
-         [Volumetric Calculation]
-         Vol_Weight = (L × W × H) / 5000
-                     │
-                     ▼
-         [Chargeable Weight Assessment]
-         Chargeable_Weight = MAX(Actual_Weight, Vol_Weight)
-                     │
-                     ▼
-         [Rate Card Matrix Lookup]
-         Matches (PickupZone, DropZone, OrderType)
-                     │
-                     ▼
-         [Base Charge Computation]
-         Base_Charge = MAX(Chargeable_Weight × Rate_Per_Kg, Minimum_Charge)
-                     │
-                     ▼
-         [Surcharge Engine (COD/Type)]
-         Final_Charge = Base_Charge + COD_Surcharge
+[Parcel Input: L, W, H, Weight, Zones, B2B/B2C, Payment Type]
+                          │
+                          ▼
+            [Volumetric Weight Computation]
+            Vol_Weight = (L × W × H) / 5000
+                          │
+                          ▼
+            [Chargeable Weight Assessment]
+            Chargeable_Weight = MAX(Actual_Weight, Vol_Weight)
+                          │
+                          ▼
+            [Route Rate Card Matrix Lookup]
+            Match (pickup_zone_id, drop_zone_id, order_type)
+                          │
+                          ▼
+            [Base Transportation Charge]
+            Base_Charge = MAX(Chargeable_Weight × rate_per_kg, minimum_charge)
+                          │
+                          ▼
+            [Payment Surcharge Evaluation]
+            Final_Charge = Base_Charge + (PaymentType == COD ? CodSurcharge : 0)
 ```
 
 ### Mathematical Formulation
@@ -35,87 +35,99 @@ The Rate Calculation Engine calculates fair, volumetric-aware shipping charges d
    $$\text{Chargeable Weight} = \max(\text{Actual Gross Weight}, \text{Volumetric Weight})$$
 3. **Base Charge**:
    $$\text{Base Charge} = \max(\text{Chargeable Weight} \times \text{RatePerKg}, \text{MinimumCharge})$$
-4. **Final Charge**:
-   $$\text{Final Charge} = \text{Base Charge} + \mathbb{I}_{\text{COD}} \times \text{CodSurcharge}(\text{OrderType})$$
+4. **Final Billable Total**:
+   $$\text{Final Charge} = \text{Base Charge} + \mathbb{I}_{\text{COD}} \cdot \text{CodSurcharge}(\text{OrderType})$$
 
-The engine exposes a pre-booking estimation endpoint (`/api/rates/estimate`) that lets customers inspect full cost breakdowns (volumetric weight, chargeable weight, base rate, COD fee) prior to committing transactions.
+The engine provides an instant pre-booking endpoint (`/api/rates/estimate`) that returns itemized cost breakdowns (volumetric weight, chargeable weight, base rate, COD fee) before order persistence.
 
 ---
 
 ## 2. Zone Detection & Geographic Hierarchy Approach
 
-Zone management utilizes a relational geographic hierarchy:
-- **`zones`**: Primary geographic hubs (e.g., North, South, East, West, Central).
-- **`zone_areas`**: Granular neighborhoods, postal codes, and local sub-districts mapped to zones.
-- **`rate_cards`**: Directional routes connecting `pickup_zone_id` and `drop_zone_id`.
+Territory management is modeled as a two-tier relational hierarchy:
+- **`zones`**: Primary logistical distribution hubs (e.g., North Hub, South Hub, Central Metro).
+- **`zone_areas`**: Granular neighborhoods, postal localities, and zip corridors mapped to parent zones.
+- **`rate_cards`**: Directional transit matrices defining pricing between origin `pickup_zone_id` and destination `drop_zone_id`.
 
-### Directional & Intra vs. Inter-Zone Processing
-- **Intra-Zone**: When $\text{pickup\_zone\_id} = \text{drop\_zone\_id}$, intra-city rates apply with lower base rates and minimal transit times.
-- **Inter-Zone**: When $\text{pickup\_zone\_id} \neq \text{drop\_zone\_id}$, cross-corridor rates apply.
-- **B2B vs. B2C Segregation**: Business contracts feature higher minimum thresholds with lower per-kg increments, while retail accounts support flexible individual rates.
+```
++-------------------------------------------------------------------+
+|                        RELATIONAL ZONE HIERARCHY                  |
+|                                                                   |
+|   Zone: North Hub (ID: 1)         Zone: South Hub (ID: 2)         |
+|   ├── Area: Connaught Place       ├── Area: Koramangala           |
+|   └── Area: Rohini Sector 10      └── Area: Indiranagar           |
+|                                                                   |
+|   [Route Matrix: Zone 1 -> Zone 2 | B2C | ₹35/kg | Min: ₹70]      |
++-------------------------------------------------------------------+
+```
 
-Admins configure zones, areas, and rate cards dynamically via REST endpoints without requiring application restarts or migrations.
+### Directional & Corridor Logic
+- **Intra-Zone Routing**: When $\text{pickup\_zone\_id} = \text{drop\_zone\_id}$, intra-hub local rates apply with lower base costs and reduced minimum charges.
+- **Inter-Zone Routing**: When $\text{pickup\_zone\_id} \neq \text{drop\_zone\_id}$, cross-corridor rates reflect trunk-line haulage overhead.
+- **B2B vs. B2C Tiering**: B2B accounts enforce higher bulk weight minimums with lower marginal per-kg rates; B2C rates provide flexible single-parcel pricing.
+
+All geographic mappings and tariffs are fully managed by administrators at runtime without code deployment or schema migrations.
 
 ---
 
-## 3. Intelligent Auto-Assignment Logic
+## 3. Intelligent Fleet Auto-Assignment Engine
 
-The dispatch system allocates delivery orders using a multi-criteria scoring algorithm:
+Dispatch optimization allocates unassigned shipments using a deterministic multi-criteria scoring algorithm:
 
-$$\text{Score}(A, O) = w_1 \cdot \text{ZoneMatch}(A, O) + w_2 \cdot \text{ActiveWorkload}(A)$$
+$$\text{Score}(A, O) = w_1 \cdot \text{TerritoryMatch}(A, O) + w_2 \cdot \text{WorkloadCapacity}(A)$$
 
 ```
 [Unassigned Order Placed / Rescheduled]
-                     │
-                     ▼
-  [Filter Active & Available Fleet Agents]
+                 │
+                 ▼
+  [Filter Online & Available Fleet Agents]
   (role = DELIVERY_AGENT AND available = TRUE)
-                     │
-                     ▼
-     [Zone & Operating Area Matching]
+                 │
+                 ▼
+     [Territory Proximity Matching]
   (Agent Preferred Area matches Order Pickup Zone)
-                     │
-                     ▼
-         [Workload Load Balancing]
-  (Sort by fewest active in-progress runs)
-                     │
-                     ▼
-        [Atomic Driver Assignment]
-  (Update delivery_agent_id + Write Tracking Log)
+                 │
+                 ▼
+        [Queue Load Balancing]
+  (Sort by fewest active deliveries: IN_PROGRESS < Threshold)
+                 │
+                 ▼
+       [Atomic Driver Assignment]
+  (Set delivery_agent_id + Write Immutable Audit History)
 ```
 
-1. **Eligibility Filter**: Queries agents with `role = DELIVERY_AGENT` and `available = TRUE`.
-2. **Proximity / Operating Preference**: Matches the order's pickup zone with the agent's verified operating territory.
-3. **Queue Balancing**: Among matching candidates, selects the agent with the lowest number of active shipments (`PICKED_UP`, `IN_TRANSIT`, `OUT_FOR_DELIVERY`), preventing driver saturation and maximizing SLA compliance.
-4. **Immutable Audit Record**: Assignment is committed atomically, logging the assigning actor (Admin or System Auto-Assign) in `order_tracking_history`.
+1. **Fleet Candidate Filtering**: Identifies active personnel with `role = DELIVERY_AGENT` and duty state `available = TRUE`.
+2. **Territory Matching**: Prioritizes drivers whose verified operating sector aligns with the parcel's pickup zone.
+3. **Queue Balancing**: Among matching candidates, assigns the driver with the lowest count of concurrent active deliveries (`PICKED_UP`, `IN_TRANSIT`, `OUT_FOR_DELIVERY`), preventing driver saturation.
+4. **Audit Immutability**: Writes an atomic entry to `order_tracking_history`, capturing the actor ID, assigned agent, and assignment timestamp.
 
 ---
 
-## 4. Failed Delivery & Reschedule Handling
+## 4. Failed Delivery & Self-Service Rescheduling Lifecycle
 
-Logistics operations encounter access restrictions, customer unavailability, or incorrect addresses. The system provides an automated recovery workflow:
+Deliveries encountering field impediments (e.g., customer unavailable, inaccessible address) trigger an automated exception workflow:
 
 ```
-[Agent marks attempt FAILED + records failure reason]
-                     │
-                     ▼
-   [Write DeliveryAttempt Record (Attempt #n)]
-                     │
-                     ▼
-   [Emit Multi-Channel Alerts (Email + SMS)]
-                     │
-                     ▼
-[Customer accesses Portal -> Selects Reschedule Date]
-                     │
-                     ▼
-      [Status -> RESCHEDULED & Agent Unassigned]
-                     │
-                     ▼
-   [Order Re-enters Queue for Fresh Dispatch]
+[Agent Marks Attempt FAILED + Captures Reason]
+                      │
+                      ▼
+   [Persist DeliveryAttempt Ledger (Attempt #N)]
+                      │
+                      ▼
+   [Dispatch Multi-Channel Alerts (Brevo HTTPS + SMS)]
+                      │
+                      ▼
+[Customer Self-Service Portal -> Selects Reschedule Date]
+                      │
+                      ▼
+    [Order State -> RESCHEDULED & Agent Unassigned]
+                      │
+                      ▼
+   [Order Re-enters Dispatch Queue for Next-Day Allocation]
 ```
 
-1. **Failure Capture**: The delivery agent records the failure state along with structured failure reasons (e.g., *Customer Unavailable*, *Wrong Address*, *Gate Access Refused*).
-2. **Attempt Ledger**: A `delivery_attempts` entry is created recording attempt number, timestamp, agent ID, and reason.
-3. **Customer Alerting**: Automated Email and SMS notifications inform the customer with a direct resolution link.
-4. **Self-Service Rescheduling**: Customers specify a new target delivery date and optional access notes directly from the portal.
-5. **Reassignment Cycle**: The order transitions to `RESCHEDULED`, unassigns the previous agent, and re-enters the dispatch queue for reassignment or auto-assignment on the requested delivery date.
+1. **Field Failure Capture**: The delivery agent records the failure state with structured metadata (*Customer Unavailable*, *Address Incomplete*, *Premises Locked*).
+2. **Attempt Ledger**: An immutable record in `delivery_attempts` logs the attempt index, timestamp, driver ID, and reason.
+3. **Automated Notification**: Brevo transactional emails and SMS deliver direct links to the customer self-service interface.
+4. **Customer Rescheduling**: Customers select a new delivery window and submit revised access instructions without contacting support.
+5. **Driver Reallocation**: The order transitions to `RESCHEDULED`, unbinds the previous driver, and re-enters the active dispatch pool for fresh allocation.
